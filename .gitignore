@@ -7,4 +7,4 @@ tmp
 .idea
 .deployment
 deploy.sh
-secret
+secret/
