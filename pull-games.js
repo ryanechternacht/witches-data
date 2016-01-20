@@ -22,12 +22,30 @@ var defaults = setupDefaults(),
     host = azureInfo.host,
     masterKey = azureInfo.masterKey;
 
-lookupDate(date).then(function(snell) { 
-    var gameList = _.keys(snell.games);
+lookupDate(date).then(function(results) { 
+    var gameList = _.keys(results.games);
+    console.log(gameList);
     writeStatus(tempFile, date, gameList);
 
-    
+    setInterval(function() { 
+        console.log(gameList.length);
+        var game = gameList.shift();
+        console.log(game);
+
+        pullGame(game).then(function(data) { 
+            console.log(data[100].commands);
+        });
+    }, 30000); //30ms
 });
+
+// function getGames(gameList) { 
+//     var game = gameList.shift();
+//     console.log(game);
+
+//     pullGame(game).then(function(data) { 
+//         console.log(data[100].commands);
+//     });
+// }
 
 
 function setupDefaults() {
@@ -75,23 +93,23 @@ function lookupDate(date) {
 
     return new Promise(function (resolve, reject) {
         var request = http.request(options);
-        var snell;
+        var data;
 
         request.on('response', function(response) {
-            var data = '';
+            var tmp = '';
 
             response.on('data', function(chunk) {
                 // console.log('chunk');
-                data += chunk;
+                tmp += chunk;
             });
 
             response.on('end', function() { 
                 // console.log('end');
-                snell = JSON.parse(data);
+                data = JSON.parse(tmp);
                 resolve({
-                    players: snell.players,
-                    games: snell.games
-                })
+                    players: data.players,
+                    games: data.games
+                });
             });
         }).end(); // invoke immediately
     });
@@ -106,7 +124,36 @@ function writeStatus(tempFile, date, gameList) {
 
     fs.writeFile(tempFile, data, function(err) {
       if (err) throw err;
-      console.log('It\'s saved!');
+    });
+}
+
+function pullGame(game) { 
+    var path = '/app/view-game/?game=' + game;
+    var options = {
+        host: 'terra.snellman.net',
+        port: 80,
+        path: path,
+        method: 'GET'
+    };
+
+    return new Promise(function (resolve, reject) {
+        var request = http.request(options);
+        var data;
+
+        request.on('response', function(response) {
+            var tmp = '';
+
+            response.on('data', function(chunk) {
+                // console.log('chunk');
+                tmp += chunk;
+            });
+
+            response.on('end', function() { 
+                // console.log('end');
+                data = JSON.parse(tmp);
+                resolve(data.ledger);
+            });
+        }).end(); // invoke immediately
     });
 }
 
