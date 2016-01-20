@@ -3,12 +3,9 @@ var DocumentClient = require('documentdb').DocumentClient,
     argv = require('minimist')(process.argv.slice(2)),
     _ = require('underscore'),
     moment = require('moment'),
-    http = require('http');
-
-var defaults = {
-    tempFile: 'games.tmp',
-    startDate: moment('2013-05-01', 'YYYY-MM-DD')
-}
+    http = require('http'),
+    Promise = require('promise'),
+    fs = require('fs');
 
 if(argv['?'] || argv.h || _.contains(argv._, 'help')) { 
     console.log('\t-a \t\t start at first game on snellman');
@@ -19,72 +16,98 @@ if(argv['?'] || argv.h || _.contains(argv._, 'help')) {
     return;
 }
 
-var tempFile;
-if(argv.f) { 
-    if(typeof argv.f == "string") { 
-        tempFile = argv.f;
-    } else {
-        console.log('BAD ARGUMENTS: -f must pass a file');
-        return;
-    }
-    
-}
-else { 
-    tempFile = defaults.tempFile;
-}
+var defaults = setupDefaults(),
+    tempFile = setupTempFile(argv, defaults),
+    date = setupDate(argv, defaults),
+    host = azureInfo.host,
+    masterKey = azureInfo.masterKey;
 
-var date;
-if(argv.d) { 
-    if(typeof argv.d == "string") { 
-        startDate = moment(argv.d, 'YYYY-MM-DD');
-    } else {
-        console.log('BAD ARGUMENTS: -d muss pass a date');
-        return;
-    }
-}
-else {
-    date = defaults.startDate;
-}
-
-var host = azureInfo.host;
-var masterKey = azureInfo.masterKey;
-
-
-// var url = 'http://terra.snellman.net/app/results/v2/' + date.format('YYYY/MM/DD');
-// console.log(url);
-var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
-console.log(path);
-
-var options = {
-    host: 'terra.snellman.net',
-    port: 80,
-    path: path,
-    method: 'GET'
-};
-
-var request = http.request(options);
-var snell;
-request.on('response', function(response) {
-    var data = '';
-
-    response.on('data', function(chunk) {
-        // console.log('chunk');
-        data += chunk;
-    });
-
-    response.on('end', function() { 
-        // console.log('end');
-        snell = JSON.parse(data);
-        doWork(snell);
-    });
-}).end(); // end() makes it block
-
-function doWork(snell) { 
+lookupDate(date).then(function(snell) { 
     var gameList = _.keys(snell.games);
+    writeStatus(tempFile, date, gameList);
+
+    
+});
+
+
+function setupDefaults() {
+    return {
+        tempFile: 'run.tmp',
+        startDate: moment('2013-05-01', 'YYYY-MM-DD')
+    };
+}
+
+function setupTempFile(argv, defaults) { 
+    if(argv.f) { 
+        if(typeof argv.f == "string") { 
+            return argv.f;
+        } else {
+            throw new Error('BAD ARGUMENTS: -f must pass a file');
+        }
+    }
+    else { 
+        return defaults.tempFile;
+    }
+}
+
+function setupDate(argv, defaults) { 
+    if(argv.d) { 
+        if(typeof argv.d == "string") { 
+            return moment(argv.d, 'YYYY-MM-DD');
+        } else {
+            throw new Error('BAD ARGUMENTS: -d muss pass a date');
+        }
+    }
+    else {
+        return defaults.startDate;
+    }
+}
+
+// returns {player, games}
+function lookupDate(date) { 
+    var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
+    var options = {
+        host: 'terra.snellman.net',
+        port: 80,
+        path: path,
+        method: 'GET'
+    };
+
+    return new Promise(function (resolve, reject) {
+        var request = http.request(options);
+        var snell;
+
+        request.on('response', function(response) {
+            var data = '';
+
+            response.on('data', function(chunk) {
+                // console.log('chunk');
+                data += chunk;
+            });
+
+            response.on('end', function() { 
+                // console.log('end');
+                snell = JSON.parse(data);
+                resolve({
+                    players: snell.players,
+                    games: snell.games
+                })
+            });
+        }).end(); // invoke immediately
+    });
+}
+
+function writeStatus(tempFile, date, gameList) { 
+    var data = date.format();
     for(var i = 0; i < gameList.length; i++) { 
         var game = gameList[i];
-        console.log(game);
+        data += '\n' + game;
     }
+
+    fs.writeFile(tempFile, data, function(err) {
+      if (err) throw err;
+      console.log('It\'s saved!');
+    });
 }
 
 // var today = moment();

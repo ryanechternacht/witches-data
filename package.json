@@ -1,0 +1,27 @@
+{
+  "name": "witches-data",
+  "version": "0.0.1",
+  "description": "Pulls down games from terra.snellman.net, parses and processes them, and stores the reuslts in an Azure DocumentDb for use by witches-den",
+  "main": "pull-games.js",
+  "dependencies": {
+    "documentdb": "^1.5.1",
+    "moment": "^2.11.1",
+    "minimist": "^1.2.0",
+    "promise": "^7.1.1",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanechternacht/witches-data.git"
+  },
+  "author": "ryan echternacht",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ryanechternacht/witches-data/issues"
+  },
+  "homepage": "https://github.com/ryanechternacht/witches-data"
+}

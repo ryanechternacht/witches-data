@@ -8,3 +8,4 @@ tmp
 .deployment
 deploy.sh
 secret/
+run.tmp
