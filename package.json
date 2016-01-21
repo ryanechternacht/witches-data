@@ -1,13 +1,15 @@
 {
   "name": "witches-data",
   "version": "0.0.1",
-  "description": "Pulls down games from terra.snellman.net, parses and processes them, and stores the reuslts in an Azure DocumentDb for use by witches-den",
+  "description": "",
   "main": "pull-games.js",
   "dependencies": {
     "documentdb": "^1.5.1",
-    "moment": "^2.11.1",
+    "http-sync": "^0.1.2",
     "minimist": "^1.2.0",
+    "moment": "^2.11.1",
     "promise": "^7.1.1",
+    "sleep": "^3.0.0",
     "underscore": "^1.8.3"
   },
   "devDependencies": {},
