@@ -25,31 +25,42 @@ var defaults = setupDefaults(),
     host = azureInfo.host,
     masterKey = azureInfo.masterKey;
 
-// while(date < today) { 
-    
-// }
+// REFACTOR THE DATE LOOKUP CODE
+var lookup = lookupDateSync(date),
+    gameList = lookup.games;
+    // players = lookup.players;
+while(date < today) { 
+    // if empty, get new games
+    if(gameList.length == 0) { 
+        date = date.add(1, 'day');
+        console.log(date.format());
 
-var data = lookupDateSync(date);
-var gameList = _.keys(data.games);
-writeStatus(tempFile, date, gameList);
-while(gameList.length > 0) { 
-    console.log(gameList.length);
+        // if we're already up to date, quit
+        if(date >= today) { 
+            break;
+        }
+
+        // get games for today, handle players, increment date
+        lookup = lookupDateSync(date);
+        gameList = lookup.games;
+        // do something with lookup.players
+    }
+
     var game = gameList.shift();
+        // ledger = pullGameSync(game);
+    // do something with game
+    // console.log(ledger[100]);
     console.log(game);
-    var ledger = pullGameSync(game);
-    console.log(ledger[100]);
-    console.log();
-    sleep.sleep(10); // 10s
+
+    writeStatusSync(tempFile, date, gameList);
+
+    sleep.usleep(1000000); // 1s
+    // sleep.sleep(30); // 30s
+
 }
 
-// var today = moment();
-// for(/*date*/; date <= today; date = date.add(1, 'day')) { 
-//     console.log('http://terra.snellman.net/app/results/v2/' + date.format('YYYY/MM/DD'));
-// }
 
-
-
-
+// SUPPORTING FUNCTIONS
 function setupDefaults() {
     return {
         tempFile: 'run.tmp',
@@ -110,7 +121,7 @@ function setupDate(argv, defaults) {
 //                 data = JSON.parse(tmp);
 //                 resolve({
 //                     players: data.players,
-//                     games: data.games
+//                     games: _.keys(data.games)
 //                 });
 //             });
 //         }).end(); // invoke immediately
@@ -140,20 +151,30 @@ function lookupDateSync(date) {
     var data = JSON.parse(response.body.toString());
     return {
         players: data.players,
-        games: data.games
+        games: _.keys(data.games)
     }
 }
 
-function writeStatus(tempFile, date, gameList) { 
+// function writeStatus(tempFile, date, gameList) { 
+//     var data = date.format();
+//     for(var i = 0; i < gameList.length; i++) { 
+//         var game = gameList[i];
+//         data += '\n' + game;
+//     }
+
+//     fs.writeFile(tempFile, data, function(err) { 
+//         if(err) throw;
+//     });
+// }
+
+function writeStatusSync(tempFile, date, gameList) { 
     var data = date.format();
     for(var i = 0; i < gameList.length; i++) { 
         var game = gameList[i];
         data += '\n' + game;
     }
 
-    fs.writeFile(tempFile, data, function(err) {
-      if (err) throw err;
-    });
+    fs.writeFileSync(tempFile, data);
 }
 
 // function pullGame(game) { 
