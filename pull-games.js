@@ -12,7 +12,7 @@ var DocumentClient = require('documentdb').DocumentClient,
 if(argv['?'] || argv.h || _.contains(argv._, 'help')) { 
     console.log('\t-a \t\t start at first game on snellman');
     console.log('\t-d date \t (YYYY-MM-DD) start at date on snellman');
-    console.log('\t-r <file> \t resume from <file>, uses default if none set');
+    console.log('\t-r \t\t resume from file set in -f, uses default if none set');
     console.log('\t-f file \t store progress in file');
     console.log('\t-h, -?, help \t print help')
     return;
@@ -20,29 +20,36 @@ if(argv['?'] || argv.h || _.contains(argv._, 'help')) {
 
 var defaults = setupDefaults(),
     tempFile = setupTempFile(argv, defaults),
-    date = setupDate(argv, defaults),
     today = moment(),
     host = azureInfo.host,
     masterKey = azureInfo.masterKey;
 
-// REFACTOR THE DATE LOOKUP CODE
-var lookup = lookupDateSync(date),
-    gameList = lookup.games;
-    // players = lookup.players;
+var date, gameList;
+if(argv['r']) { 
+    var load = loadStatusFileSync(tempFile);
+    date = load.date;
+    gameList = load.gameList;
+} else 
+{
+    date = setupDate(argv, defaults);
+    gameList = lookupDateSync(date);
+}
+
 while(date < today) { 
     // if empty, get new games
     if(gameList.length == 0) { 
+        // incrememnt day
         date = date.add(1, 'day');
         console.log(date.format());
 
         // if we're already up to date, quit
         if(date >= today) { 
+            fs.unlinkSync(tempFile);
             break;
         }
 
-        // get games for today, handle players, increment date
-        lookup = lookupDateSync(date);
-        gameList = lookup.games;
+        var lookup = lookupDateSync(date);
+        gameList = lookup.gameList;
         // do something with lookup.players
     }
 
@@ -94,8 +101,30 @@ function setupDate(argv, defaults) {
     }
 }
 
+function loadStatusFileSync(tempFile) { 
+    var file = fs.readFileSync(tempFile, 'utf-8'),
+        data = file.split('\n'),
+        date = moment(data.shift());
+
+    return { 
+        date: date,
+        gameList: data
+    };
+}
+
+function lookupDateSync(date) { 
+    var lookup = pullDateSync(date),
+        gameList = lookup.games,
+        players = lookup.players;
+
+    return {
+        gameList: gameList,
+        players: players
+    };
+}
+
 // returns {player, games}
-// function lookupDate(date) { 
+// function pullDate(date) { 
 //     var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
 //     var options = {
 //         host: 'terra.snellman.net',
@@ -129,7 +158,7 @@ function setupDate(argv, defaults) {
 // }
 
 // returns {player, games}
-function lookupDateSync(date) { 
+function pullDateSync(date) { 
     var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
     var options = {
         host: 'terra.snellman.net',
@@ -229,6 +258,8 @@ function pullGameSync(game) {
     var data = JSON.parse(response.body.toString());
     return data.ledger;
 }
+
+
 
 // var client = new DocumentClient(host, {masterKey: masterKey});
 
