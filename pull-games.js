@@ -13,8 +13,9 @@ if(argv['?'] || argv.h || _.contains(argv._, 'help')) {
     console.log('\t-a \t\t start at first game on snellman');
     console.log('\t-d date \t (YYYY-MM-DD) start at date on snellman');
     console.log('\t-r \t\t resume from file set in -f, uses default if none set');
+    console.log('\t-s \t\t start a new run even if a temp file exists');
     console.log('\t-f file \t store progress in file');
-    console.log('\t-h, -?, help \t print help')
+    console.log('\t-h, -?, help \t print help');
     return;
 }
 
@@ -26,13 +27,29 @@ var defaults = setupDefaults(),
 
 var date, gameList;
 if(argv['r']) { 
+    if(argv['d'] || argv['a']) { 
+        console.log("Can't use -d, -a, or -s with -r. Exiting...");
+        return;
+    }
+    if(!fs.existsSync(tempFile)) {
+        console.log("Temp file [" + tempFile + "] not found. Exiting...");
+        return;
+    }
+
     var load = loadStatusFileSync(tempFile);
     date = load.date;
     gameList = load.gameList;
 } else 
 {
+    // unless -s or no tmp file
+    if(!(argv['s'] || !fs.existsSync(tempFile))) { 
+        console.log('Last run is not finished. Either resume (with -r) or pass -s to start a new run. Exiting...');
+        return;
+    }
     date = setupDate(argv, defaults);
-    gameList = lookupDateSync(date);
+    var lookup = lookupDateSync(date);
+    gameList = lookup.gameList;
+    // do something with lookup.players
 }
 
 while(date < today) { 
@@ -124,40 +141,6 @@ function lookupDateSync(date) {
 }
 
 // returns {player, games}
-// function pullDate(date) { 
-//     var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
-//     var options = {
-//         host: 'terra.snellman.net',
-//         port: 80,
-//         path: path,
-//         method: 'GET'
-//     };
-
-//     return new Promise(function (resolve, reject) {
-//         var request = http.request(options);
-//         var data;
-
-//         request.on('response', function(response) {
-//             var tmp = '';
-
-//             response.on('data', function(chunk) {
-//                 // console.log('chunk');
-//                 tmp += chunk;
-//             });
-
-//             response.on('end', function() { 
-//                 // console.log('end');
-//                 data = JSON.parse(tmp);
-//                 resolve({
-//                     players: data.players,
-//                     games: _.keys(data.games)
-//                 });
-//             });
-//         }).end(); // invoke immediately
-//     });
-// }
-
-// returns {player, games}
 function pullDateSync(date) { 
     var path = '/app/results/v2/' + date.format('YYYY/MM/DD');
     var options = {
@@ -184,18 +167,6 @@ function pullDateSync(date) {
     }
 }
 
-// function writeStatus(tempFile, date, gameList) { 
-//     var data = date.format();
-//     for(var i = 0; i < gameList.length; i++) { 
-//         var game = gameList[i];
-//         data += '\n' + game;
-//     }
-
-//     fs.writeFile(tempFile, data, function(err) { 
-//         if(err) throw;
-//     });
-// }
-
 function writeStatusSync(tempFile, date, gameList) { 
     var data = date.format();
     for(var i = 0; i < gameList.length; i++) { 
@@ -205,36 +176,6 @@ function writeStatusSync(tempFile, date, gameList) {
 
     fs.writeFileSync(tempFile, data);
 }
-
-// function pullGame(game) { 
-//     var path = '/app/view-game/?game=' + game;
-//     var options = {
-//         host: 'terra.snellman.net',
-//         port: 80,
-//         path: path,
-//         method: 'GET'
-//     };
-
-//     return new Promise(function (resolve, reject) {
-//         var request = http.request(options);
-//         var data;
-
-//         request.on('response', function(response) {
-//             var tmp = '';
-
-//             response.on('data', function(chunk) {
-//                 // console.log('chunk');
-//                 tmp += chunk;
-//             });
-
-//             response.on('end', function() { 
-//                 // console.log('end');
-//                 data = JSON.parse(tmp);
-//                 resolve(data.ledger);
-//             });
-//         }).end(); // invoke immediately
-//     });
-// }
 
 function pullGameSync(game) { 
     var path = '/app/view-game/?game=' + game;
