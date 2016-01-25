@@ -1,3 +1,7 @@
+'use strict';
+
+// TODO a better logging system
+
 var DocumentClient = require('documentdb').DocumentClient,
     azureInfo = require('./secret/azureinfo.js'),
     argv = require('minimist')(process.argv.slice(2)),
@@ -25,6 +29,7 @@ var defaults = setupDefaults(),
     host = azureInfo.host,
     masterKey = azureInfo.masterKey;
 
+// handle resuming or starting a new run
 var date, gameList;
 if(argv['r']) { 
     if(argv['d'] || argv['a']) { 
@@ -52,6 +57,9 @@ if(argv['r']) {
     // do something with lookup.players
 }
 
+
+
+// work loop
 while(date < today) { 
     // if empty, get new games
     if(gameList.length == 0) { 
@@ -70,17 +78,15 @@ while(date < today) {
         // do something with lookup.players
     }
 
-    var game = gameList.shift();
-        // ledger = pullGameSync(game);
-    // do something with game
-    // console.log(ledger[100]);
-    console.log(game);
+    var gameName = gameList.shift();
+    var gameData = pullGameSync(gameName);
+    uploadGame(gameName, gameData);
+    console.log(gameName);
 
     writeStatusSync(tempFile, date, gameList);
 
-    sleep.usleep(1000000); // 1s
-    // sleep.sleep(30); // 30s
-
+    // sleep.usleep(1000000); // 1s
+    sleep.sleep(30); // 30s
 }
 
 
@@ -177,8 +183,8 @@ function writeStatusSync(tempFile, date, gameList) {
     fs.writeFileSync(tempFile, data);
 }
 
-function pullGameSync(game) { 
-    var path = '/app/view-game/?game=' + game;
+function pullGameSync(gameName) { 
+    var path = '/app/view-game/?game=' + gameName;
     var options = {
         host: 'terra.snellman.net',
         port: 80,
@@ -197,28 +203,61 @@ function pullGameSync(game) {
         throw new Error("pullGameSync timed out");
     }
     var data = JSON.parse(response.body.toString());
-    return data.ledger;
+    return data;
 }
 
+function uploadGame(gameName, gameData) { 
+    // manually set id to gameName
+    gameData.id = gameName;
 
+    var client = new DocumentClient(host, {masterKey: masterKey});
 
-// var client = new DocumentClient(host, {masterKey: masterKey});
+    var collLink = 'dbs/snellman/colls/games';
+    var docLink = 'dbs/snellman/colls/games/docs/onion';
+    var dbOptions = {};
 
-// var dQuery = {query: "Select * from c"};
-// var dOptions = {};
-// var d = '';
-// var collLink = 'dbs/snellman-raw/colls/games'
-// client.queryDocuments(collLink, dQuery, dOptions).toArray(function(err, results) {
-//     if(err) { 
-//         console.log("document lookup failed");
-//         console.log(err);
-//         return;
-//     }
+    client.deleteDocument(docLink, dbOptions, function(err, document) { 
+        if(err) { 
+            if(err.code == '404') { 
+                // document not found, just keep going
+            } else {
+                console.log('document deletion failed');
+                console.log(err);
+            }
+        }
 
-//     d = results[0];
+        client.createDocument(collLink, gameData, function(err, document) { 
+            if(err) { 
+                console.log("document addition failed");
+                console.log(err);
+                return;
+            }
 
-//     console.log(d.name);
-// });
+            // where to log?
+            console.log('created document: ' + gameName);
+        });
+    });
+}
+
+// I'd like to do this, but too lazy to figure out the async stuff 
+// function gameInDb(DocumentClient, game) { 
+//     var client = new DocumentClient(host, {masterKey: masterKey});
+
+//     var dQuery = {query: "Select c.id from c where c.gamename = 'onion'"};
+//     console.log(dQuery);
+//     var dOptions = {};
+//     var collLink = 'dbs/snellman/colls/games';
+//     client.queryDocuments(collLink, dQuery, dOptions).toArray(function(err, results) {
+//         if(err) { 
+//             console.log("document lookup failed");
+//             console.log(err);
+//             return;
+//         }
+
+//         return results.length > 0;
+//     });
+// }
+
 
 
 
