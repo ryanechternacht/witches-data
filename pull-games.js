@@ -11,7 +11,8 @@ var DocumentClient = require('documentdb').DocumentClient,
     // Promise = require('promise'),
     httpSync = require('http-sync'),
     fs = require('fs'),
-    sleep = require('sleep');
+    sleep = require('sleep'),
+    semaphore = require('semaphore')(1);
 
 if(argv['?'] || argv.h || _.contains(argv._, 'help')) { 
     console.log('\t-a \t\t start at first game on snellman');
@@ -57,37 +58,73 @@ if(argv['r']) {
     // do something with lookup.players
 }
 
+var interval = setInterval(function() { 
+    console.log('start interval iteration');
 
-
-// work loop
-while(date < today) { 
-    // if empty, get new games
-    if(gameList.length == 0) { 
-        // incrememnt day
-        date = date.add(1, 'day');
-        console.log(date.format());
-
-        // if we're already up to date, quit
-        if(date >= today) { 
-            fs.unlinkSync(tempFile);
-            break;
-        }
-
-        var lookup = lookupDateSync(date);
-        gameList = lookup.gameList;
-        // do something with lookup.players
+    // if last not done, just bail
+    if(semaphore.current > 0) { 
+        return;
     }
 
-    var gameName = gameList.shift();
-    var gameData = pullGameSync(gameName);
-    uploadGame(gameName, gameData);
-    console.log(gameName);
+    semaphore.take(function() { 
+        // if empty, get new games
+        if(gameList.length == 0) { 
+            // incrememnt day
+            date = date.add(1, 'day');
+            console.log(date.format());
 
-    writeStatusSync(tempFile, date, gameList);
+            // if we're already up to date, quit
+            if(date >= today) { 
+                fs.unlinkSync(tempFile);
+                clearInterval(interval);
+                return;
+            }
 
-    // sleep.usleep(1000000); // 1s
-    sleep.sleep(30); // 30s
-}
+            var lookup = lookupDateSync(date);
+            gameList = lookup.gameList;
+            // do something with lookup.players
+        }
+
+        var gameName = gameList.shift();
+        var gameData = pullGameSync(gameName);
+        uploadGame(gameName, gameData);
+        console.log(gameName);
+
+        writeStatusSync(tempFile, date, gameList);
+
+        semaphore.leave();
+    });
+}, 30000); // 30s
+
+// work loop
+// while(date < today) { 
+//     // if empty, get new games
+//     if(gameList.length == 0) { 
+//         // incrememnt day
+//         date = date.add(1, 'day');
+//         console.log(date.format());
+
+//         // if we're already up to date, quit
+//         if(date >= today) { 
+//             fs.unlinkSync(tempFile);
+//             break;
+//         }
+
+//         var lookup = lookupDateSync(date);
+//         gameList = lookup.gameList;
+//         // do something with lookup.players
+//     }
+
+//     var gameName = gameList.shift();
+//     var gameData = pullGameSync(gameName);
+//     uploadGame(gameName, gameData);
+//     console.log(gameName);
+
+//     writeStatusSync(tempFile, date, gameList);
+
+//     // sleep.usleep(1000000); // 1s
+//     sleep.sleep(30); // 30s
+// }
 
 
 // SUPPORTING FUNCTIONS
@@ -213,7 +250,7 @@ function uploadGame(gameName, gameData) {
     var client = new DocumentClient(host, {masterKey: masterKey});
 
     var collLink = 'dbs/snellman/colls/games';
-    var docLink = 'dbs/snellman/colls/games/docs/onion';
+    var docLink = collLink + '/docs/' + gameName;
     var dbOptions = {};
 
     client.deleteDocument(docLink, dbOptions, function(err, document) { 
