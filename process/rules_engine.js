@@ -1,8 +1,7 @@
 'use strict';
 
 
-angular.module('wd.process', [])
-.factory('rulesengine', [function() { 
+module.exports = (function() { 
     
     var rules = [
         score1_onSpd,
@@ -1472,11 +1471,4 @@ angular.module('wd.process', [])
         return null;
     }
     /// END RULES
-}]);
-
-
-
-
-
-
-
+})();
