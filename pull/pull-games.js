@@ -167,10 +167,9 @@ function loadStatusFileSync(tempFile) {
 }
 
 function lookupDateSync(date) { 
-    return undefined;
     var lookup = pullDateSync(date);
 
-    if(lookupDate == undefined) { 
+    if(lookup == undefined) { 
         return undefined;
     }
 
