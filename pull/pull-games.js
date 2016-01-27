@@ -174,7 +174,7 @@ function lookupDateSync(date) {
     }
 
     return {
-        gameList: lookup.gameList,
+        gameList: lookup.games,
         players: lookup.players
     };
 }
