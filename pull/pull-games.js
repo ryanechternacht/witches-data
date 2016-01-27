@@ -93,8 +93,10 @@ function pullGames() {
                 var lookup = lookupDateSync(date);
                 if(lookup == undefined) { 
                     // try again
+                    console.log('date lookup failed');
                     date = date.subtract(1, 'day');
                     semaphore.leave();
+                    return;
                 };
                 gameList = lookup.gameList;
                 // do something with lookup.players
@@ -103,13 +105,21 @@ function pullGames() {
             var gameName = gameList.shift();
             var gameData = pullGameSync(gameName);
             if(gameData == undefined) {
+                // try again
+                console.log('game pull failed');
                 gameList.unshift(gameName);
                 semaphore.leave();
+                return;
             };
             
             console.log('try to upload ' + gameName);
             uploadGame(gameName, gameData, function(err, document) {
-                writePullGameStatusSync(tempFile, date, gameList);
+                if(err) {
+                    console.log('game pull failed');
+                    gameList.unshift(gameName);
+                } else {
+                    writePullGameStatusSync(tempFile, date, gameList);
+                }
                 semaphore.leave();
             });
         });
@@ -154,17 +164,10 @@ function loadStatusFileSync(tempFile) {
         doc = JSON.parse(file);
 
     return doc;
-
-    //     data = file.split('\n'),
-    //     date = moment(data.shift());
-
-    // return { 
-    //     date: date,
-    //     gameList: data
-    // };
 }
 
 function lookupDateSync(date) { 
+    return undefined;
     var lookup = pullDateSync(date);
 
     if(lookupDate == undefined) { 
@@ -205,12 +208,6 @@ function pullDateSync(date) {
 }
 
 function writePullGameStatusSync(tempFile, date, gameList) { 
-    // var data = date.format();
-    // for(var i = 0; i < gameList.length; i++) { 
-    //     var game = gameList[i];
-    //     data += '\n' + game;
-    // }
-
     var doc = {
         date: date,
         gameList: gameList,
