@@ -1,16 +1,16 @@
 {
   "name": "witches-data",
   "version": "0.0.1",
-  "description": "",
-  "main": "pull-games.js",
+  "description": "Utilities for pulling data from snellman, parsing it, and preparing it for use by witches-den",
+  "main": "pull/pull-games.js",
   "dependencies": {
-    "documentdb": "^1.5.1",
-    "http-sync": "^0.1.2",
     "minimist": "^1.2.0",
+    "http-sync": "^0.1.2",
+    "documentdb": "^1.5.1",
     "moment": "^2.11.1",
-    "promise": "^7.1.1",
-    "semaphore": "^1.0.3",
     "sleep": "^3.0.0",
+    "semaphore": "^1.0.3",
+    "promise": "^7.1.1",
     "underscore": "^1.8.3"
   },
   "devDependencies": {},

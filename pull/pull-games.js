@@ -3,7 +3,7 @@
 // TODO a better logging system
 
 var DocumentClient = require('documentdb').DocumentClient,
-    azureInfo = require('./secret/azureinfo.js'),
+    azureInfo = require('../secret/azureinfo.js'),
     argv = require('minimist')(process.argv.slice(2)),
     _ = require('underscore'),
     moment = require('moment'),
@@ -12,7 +12,8 @@ var DocumentClient = require('documentdb').DocumentClient,
     httpSync = require('http-sync'),
     fs = require('fs'),
     sleep = require('sleep'),
-    semaphore = require('semaphore')(1);
+    semaphore = require('semaphore')(1),
+    path = require('path');
 
 if(argv['?'] || argv.h || _.contains(argv._, 'help')) { 
     console.log('\t-a \t\t start at first game on snellman');
@@ -24,110 +25,88 @@ if(argv['?'] || argv.h || _.contains(argv._, 'help')) {
     return;
 }
 
+
 var defaults = setupDefaults(),
     tempFile = setupTempFile(argv, defaults),
-    today = moment(),
     host = azureInfo.host,
     masterKey = azureInfo.masterKey;
 
-// handle resuming or starting a new run
-var date, gameList;
-if(argv['r']) { 
-    if(argv['d'] || argv['a']) { 
-        console.log("Can't use -d, -a, or -s with -r. Exiting...");
-        return;
-    }
-    if(!fs.existsSync(tempFile)) {
-        console.log("Temp file [" + tempFile + "] not found. Exiting...");
-        return;
-    }
 
-    var load = loadStatusFileSync(tempFile);
-    date = load.date;
-    gameList = load.gameList;
-} else 
-{
-    // unless -s or no tmp file
-    if(!(argv['s'] || !fs.existsSync(tempFile))) { 
-        console.log('Last run is not finished. Either resume (with -r) or pass -s to start a new run. Exiting...');
-        return;
-    }
-    date = setupDate(argv, defaults);
-    var lookup = lookupDateSync(date);
-    gameList = lookup.gameList;
-    // do something with lookup.players
-}
 
-var interval = setInterval(function() { 
-    console.log('start interval iteration');
+pullGames();
 
-    // if last not done, just bail
-    if(semaphore.current > 0) { 
-        return;
-    }
 
-    semaphore.take(function() { 
-        // if empty, get new games
-        if(gameList.length == 0) { 
-            // incrememnt day
-            date = date.add(1, 'day');
-            console.log(date.format());
 
-            // if we're already up to date, quit
-            if(date >= today) { 
-                fs.unlinkSync(tempFile);
-                clearInterval(interval);
-                return;
-            }
+function pullGames() { 
+    var today = moment();
 
-            var lookup = lookupDateSync(date);
-            gameList = lookup.gameList;
-            // do something with lookup.players
+    // handle resuming or starting a new run
+    var date, gameList;
+    if(argv['r']) { 
+        if(argv['d'] || argv['a']) { 
+            console.log("Can't use -d, -a, or -s with -r. Exiting...");
+            return;
+        }
+        if(!fs.existsSync(tempFile)) {
+            console.log("Temp file [" + tempFile + "] not found. Exiting...");
+            return;
         }
 
-        var gameName = gameList.shift();
-        var gameData = pullGameSync(gameName);
-        uploadGame(gameName, gameData);
-        console.log(gameName);
+        var load = loadStatusFileSync(tempFile);
+        date = moment(load.date);
+        gameList = load.gameList;
+    } else 
+    {
+        // unless -s or no tmp file
+        if(!(argv['s'] || !fs.existsSync(tempFile))) { 
+            console.log('Last run is not finished. Either resume (with -r) or pass -s to start a new run. Exiting...');
+            return;
+        }
+        date = setupDate(argv, defaults);
+        var lookup = lookupDateSync(date);
+        gameList = lookup.gameList;
+        // do something with lookup.players
+    }
 
-        writeStatusSync(tempFile, date, gameList);
+    var interval = setInterval(function() { 
+        console.log('start interval iteration');
 
-        semaphore.leave();
-    });
-}, 30000); // 30s
+        // if last not done, just bail
+        if(semaphore.current > 0) { 
+            return;
+        }
 
-// work loop
-// while(date < today) { 
-//     // if empty, get new games
-//     if(gameList.length == 0) { 
-//         // incrememnt day
-//         date = date.add(1, 'day');
-//         console.log(date.format());
+        semaphore.take(function() { 
+            // if empty, get new games
+            if(gameList.length == 0) { 
+                // incrememnt day
+                date = date.add(1, 'day');
+                console.log(date.format());
 
-//         // if we're already up to date, quit
-//         if(date >= today) { 
-//             fs.unlinkSync(tempFile);
-//             break;
-//         }
+                // if we're already up to date, quit
+                if(date >= today) { 
+                    fs.unlinkSync(tempFile);
+                    clearInterval(interval);
+                    return;
+                }
 
-//         var lookup = lookupDateSync(date);
-//         gameList = lookup.gameList;
-//         // do something with lookup.players
-//     }
+                var lookup = lookupDateSync(date);
+                gameList = lookup.gameList;
+                // do something with lookup.players
+            }
 
-//     var gameName = gameList.shift();
-//     var gameData = pullGameSync(gameName);
-//     uploadGame(gameName, gameData);
-//     console.log(gameName);
+            var gameName = gameList.shift();
+            var gameData = pullGameSync(gameName);
+            uploadGame(gameName, gameData);
+            console.log(gameName);
 
-//     writeStatusSync(tempFile, date, gameList);
+            writePullGameStatusSync(tempFile, date, gameList);
 
-//     // sleep.usleep(1000000); // 1s
-//     sleep.sleep(30); // 30s
-// }
+            semaphore.leave();
+        });
+    }, 30000); // 30s
+}
 
-
-// SUPPORTING FUNCTIONS
 function setupDefaults() {
     return {
         tempFile: 'run.tmp',
@@ -138,13 +117,13 @@ function setupDefaults() {
 function setupTempFile(argv, defaults) { 
     if(argv.f) { 
         if(typeof argv.f == "string") { 
-            return argv.f;
+            return path.join(__dirname, argv.f);
         } else {
             throw new Error('BAD ARGUMENTS: -f must pass a file');
         }
     }
     else { 
-        return defaults.tempFile;
+        return path.join(__dirname, defaults.tempFile);
     }
 }
 
@@ -163,13 +142,17 @@ function setupDate(argv, defaults) {
 
 function loadStatusFileSync(tempFile) { 
     var file = fs.readFileSync(tempFile, 'utf-8'),
-        data = file.split('\n'),
-        date = moment(data.shift());
+        doc = JSON.parse(file);
 
-    return { 
-        date: date,
-        gameList: data
-    };
+    return doc;
+
+    //     data = file.split('\n'),
+    //     date = moment(data.shift());
+
+    // return { 
+    //     date: date,
+    //     gameList: data
+    // };
 }
 
 function lookupDateSync(date) { 
@@ -210,14 +193,20 @@ function pullDateSync(date) {
     }
 }
 
-function writeStatusSync(tempFile, date, gameList) { 
-    var data = date.format();
-    for(var i = 0; i < gameList.length; i++) { 
-        var game = gameList[i];
-        data += '\n' + game;
-    }
+function writePullGameStatusSync(tempFile, date, gameList) { 
+    // var data = date.format();
+    // for(var i = 0; i < gameList.length; i++) { 
+    //     var game = gameList[i];
+    //     data += '\n' + game;
+    // }
 
-    fs.writeFileSync(tempFile, data);
+    var doc = {
+        date: date,
+        gameList: gameList,
+        type: 'pullGames'
+    };
+
+    fs.writeFileSync(tempFile, JSON.stringify(doc));
 }
 
 function pullGameSync(gameName) { 
@@ -276,24 +265,7 @@ function uploadGame(gameName, gameData) {
     });
 }
 
-// I'd like to do this, but too lazy to figure out the async stuff 
-// function gameInDb(DocumentClient, game) { 
-//     var client = new DocumentClient(host, {masterKey: masterKey});
 
-//     var dQuery = {query: "Select c.id from c where c.gamename = 'onion'"};
-//     console.log(dQuery);
-//     var dOptions = {};
-//     var collLink = 'dbs/snellman/colls/games';
-//     client.queryDocuments(collLink, dQuery, dOptions).toArray(function(err, results) {
-//         if(err) { 
-//             console.log("document lookup failed");
-//             console.log(err);
-//             return;
-//         }
-
-//         return results.length > 0;
-//     });
-// }
 
 
 
