@@ -91,18 +91,27 @@ function pullGames() {
                 }
 
                 var lookup = lookupDateSync(date);
+                if(lookup == undefined) { 
+                    // try again
+                    date = date.subtract(1, 'day');
+                    semaphore.leave();
+                };
                 gameList = lookup.gameList;
                 // do something with lookup.players
             }
 
             var gameName = gameList.shift();
             var gameData = pullGameSync(gameName);
-            uploadGame(gameName, gameData);
-            console.log(gameName);
-
-            writePullGameStatusSync(tempFile, date, gameList);
-
-            semaphore.leave();
+            if(gameData == undefined) {
+                gameList.unshift(gameName);
+                semaphore.leave();
+            };
+            
+            console.log('try to upload ' + gameName);
+            uploadGame(gameName, gameData, function(err, document) {
+                writePullGameStatusSync(tempFile, date, gameList);
+                semaphore.leave();
+            });
         });
     }, 30000); // 30s
 }
@@ -156,13 +165,15 @@ function loadStatusFileSync(tempFile) {
 }
 
 function lookupDateSync(date) { 
-    var lookup = pullDateSync(date),
-        gameList = lookup.games,
-        players = lookup.players;
+    var lookup = pullDateSync(date);
+
+    if(lookupDate == undefined) { 
+        return undefined;
+    }
 
     return {
-        gameList: gameList,
-        players: players
+        gameList: lookup.gameList,
+        players: lookup.players
     };
 }
 
@@ -184,7 +195,7 @@ function pullDateSync(date) {
     var response = request.end(); // execute synchronously
     
     if(timeout) {
-        throw new Error("lookupDateSync timed out");
+        return;
     }
     var data = JSON.parse(response.body.toString());
     return {
@@ -226,13 +237,13 @@ function pullGameSync(gameName) {
     var response = request.end(); // execute synchronously
     
     if(timeout) {
-        throw new Error("pullGameSync timed out");
+        return undefined;
     }
     var data = JSON.parse(response.body.toString());
     return data;
 }
 
-function uploadGame(gameName, gameData) { 
+function uploadGame(gameName, gameData, callback) { 
     // manually set id to gameName
     gameData.id = gameName;
 
@@ -241,6 +252,7 @@ function uploadGame(gameName, gameData) {
     var collLink = 'dbs/snellman/colls/games';
     var docLink = collLink + '/docs/' + gameName;
     var dbOptions = {};
+
 
     client.deleteDocument(docLink, dbOptions, function(err, document) { 
         if(err) { 
@@ -256,11 +268,12 @@ function uploadGame(gameName, gameData) {
             if(err) { 
                 console.log("document addition failed");
                 console.log(err);
-                return;
             }
 
             // where to log?
             console.log('created document: ' + gameName);
+
+            callback(err, document);
         });
     });
 }
