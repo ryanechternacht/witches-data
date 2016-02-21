@@ -11,7 +11,7 @@ var host = azureInfo.host,
 
 
 
-loadGames();
+// loadGames();
 // clearDb();
 
 

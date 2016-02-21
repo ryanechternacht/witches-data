@@ -121,6 +121,7 @@ function pullGames() {
                     writePullGameStatusSync(tempFile, date, gameList);
                 }
                 semaphore.leave();
+                return;
             });
         });
     }, 30000); // 30s
@@ -224,19 +225,22 @@ function pullGameSync(gameName) {
         path: path,
         method: 'GET'
     };
-
-    var request = httpSync.request(options);
-    var timeout = false;
-    request.setTimeout(10000, function() {
-        timeout = true;
-    });
-    var response = request.end(); // execute synchronously
-    
-    if(timeout) {
+    try {
+        var request = httpSync.request(options);
+        var timeout = false;
+        request.setTimeout(10000, function() {
+            timeout = true;
+        });
+        var response = request.end(); // execute synchronously
+        
+        if(timeout) {
+            return undefined;
+        }
+        var data = JSON.parse(response.body.toString());
+        return data;
+    } catch(ex) { 
         return undefined;
     }
-    var data = JSON.parse(response.body.toString());
-    return data;
 }
 
 function uploadGame(gameName, gameData, callback) { 
@@ -264,10 +268,10 @@ function uploadGame(gameName, gameData, callback) {
             if(err) { 
                 console.log("document addition failed");
                 console.log(err);
+            } else {
+                // where to log?
+                console.log('created document: ' + gameName);
             }
-
-            // where to log?
-            console.log('created document: ' + gameName);
 
             callback(err, document);
         });
