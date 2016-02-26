@@ -24,24 +24,20 @@ var gameFile = argv['f'],
 // deleteFromFile(gameFile);
 
 
-// client.readAttachments('dbs/snellman/colls/games/docs/Jan247', {})
-//     .toArray(function(err, results) { 
-//         if(err) { console.log("query"); console.log(err); }
-//         else {
-//             // console.dir(results);
-//             var attach = results[0];
-//             var mediaLink = attach.media;
-//             console.log(mediaLink);
 
-//             client.readMedia(mediaLink, function(err, document) { 
-//                 if(err) { console.log("read"); console.log(err); }
-//                 else {
-//                     var m = JSON.parse(document);
-//                     console.log(m.ledger.length);
-//                 }
-//             });
-//         }
-//     });
+pullGame("4pLeague_S10_D3L3_G6")
+.then(loadGame)
+.then(function(game) { return logStatus(game, logFile); })
+.then(function(status) {
+    console.log("success: " + status.game);
+})
+.catch(function(status) { 
+    console.dir(status);
+    console.log("failure: " + status.game + " || " + status.step);
+    console.dir(status.err)
+});
+
+
 
 function pullFromFile(gameFile, logFile) {
     setupLogFile(logFile)
