@@ -9,7 +9,7 @@ var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
     client = new DocumentClient(host, {masterKey: masterKey}),
     timeoutBetweenPulls = 2000, // 2s
-    timeoutDelay = 5000; // 5s
+    timeoutDelay = 2000; // 5s
 
 
 analyzeFaction('auren');
@@ -19,7 +19,7 @@ function analyzeFaction(faction) {
     getFactionGames(faction)
     .then(x => getGameData(x, faction))
     .then(x => analyzeGames(x, faction))
-    .then(uploadFactionResults)
+    // .then(uploadFactionResults)
     .then(console.dir)
     .catch(console.log);
 }
@@ -70,31 +70,46 @@ function analyzeGames(gameData, faction) {
     return new Promise(function(resolve, reject) { 
         var obj = { id: faction, faction: faction };
 
-        obj.total = createHistogram(_.map(gameData, x => x.total), 10, 'range');
-        obj.network = createHistogram(_.map(gameData, x => x.simple.endGameNetwork), 6, 'exact');
+        obj.total = createHistogram(
+            _.map(gameData, x => x.total), 
+            {bucketsize: 10, type: 'auto', labels: 'range'}
+        );
+        obj.network = createHistogram(
+            _.map(gameData, x => x.simple.endGameNetwork), 
+            {bucketsize: 6, type: 'auto', labels: 'exact'}
+        );
 
         resolve(obj);
     });
 }
 
 // type = 'range' (e.g. '0-9') or 'exact' (e.g. '2')
-function createHistogram(scores, bucketsize, type) { 
+function createHistogram(scores, options) { 
     // need to generate bucket names differently for type == 'range'
-    if(type == 'exact') { 
-        return _.countBy(scores, x => { 
-            if(isNaN(x)) { return 0; }
-            else { return Math.floor(x / bucketsize) * bucketsize; }
-        });
-    } else if(type == 'range') { 
-        return _.countBy(scores, x => { 
-            if(isNaN(x)) { return 0; }
-            else { 
-                var n = Math.floor(x / bucketsize) * bucketsize; 
-                return n + "-" + (n+bucketsize-1);
-            }
-        });
+    if(options.type == 'auto') { 
+        if(options.labels == 'exact') { 
+            var counts = _.countBy(scores, x => { 
+                if(isNaN(x)) { return 0; }
+                else { return Math.floor(x / options.bucketsize) * options.bucketsize; }
+            });
+            var keys = _.keys(counts);
+            return _.map(keys, x => { var obj = {}; obj[x] = counts[x]; return obj; } );
+            // return _.toArray(_.map(keys, x => {x: counts[x]}));
+        } else if(options.labels == 'range') { 
+            var counts = _.countBy(scores, x => { 
+                if(isNaN(x)) { return 0; }
+                else { 
+                    var n = Math.floor(x / options.bucketsize) * options.bucketsize; 
+                    return n + "-" + (n+options.bucketsize-1);
+                }
+            });
+            var keys = _.keys(counts);
+            return _.map(keys, x => { var obj = {}; obj[x] = counts[x]; return obj; } );
+        }
+    } else if(options.type == 'manual') {
+
     } else { 
-        throw "type must be 'range' or 'exact'";
+        throw "type must be 'auto' or 'manual'";
     }
 }
 
@@ -109,3 +124,7 @@ function uploadFactionResults(data) {
         });
     });
 }
+
+
+
+
