@@ -87,24 +87,21 @@ function analyzeGames(gameData, faction) {
 function createHistogram(scores, options) { 
     // need to generate bucket names differently for type == 'range'
     if(options.type == 'auto') { 
+        var counts = _.countBy(scores, x => { 
+            if(isNaN(x)) { return 0; }
+            else { return Math.floor(x / options.bucketsize) * options.bucketsize; }
+        });
+        var keys = _.keys(counts);
+        var nums = _.map(keys, x => parseInt(x, 10));
+        var ordered = _.sortBy(nums, x => x);
         if(options.labels == 'exact') { 
-            var counts = _.countBy(scores, x => { 
-                if(isNaN(x)) { return 0; }
-                else { return Math.floor(x / options.bucketsize) * options.bucketsize; }
-            });
-            var keys = _.keys(counts);
-            return _.map(keys, x => { var obj = {}; obj[x] = counts[x]; return obj; } );
-            // return _.toArray(_.map(keys, x => {x: counts[x]}));
+            return _.map(ordered, (x, i) => ({order: i, key: x, value: counts[x]}));
         } else if(options.labels == 'range') { 
-            var counts = _.countBy(scores, x => { 
-                if(isNaN(x)) { return 0; }
-                else { 
-                    var n = Math.floor(x / options.bucketsize) * options.bucketsize; 
-                    return n + "-" + (n+options.bucketsize-1);
-                }
-            });
-            var keys = _.keys(counts);
-            return _.map(keys, x => { var obj = {}; obj[x] = counts[x]; return obj; } );
+            return _.map(ordered, (x, i) => ({
+                order: i, 
+                value: counts[x], 
+                key: x + "-" + (x+options.bucketsize-1)
+            }));
         }
     } else if(options.type == 'manual') {
 
