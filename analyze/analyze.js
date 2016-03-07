@@ -8,20 +8,44 @@ var DocumentClient = require('documentdb').DocumentClient,
 var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
     client = new DocumentClient(host, {masterKey: masterKey}),
-    timeoutBetweenPulls = 2000, // 2s
-    timeoutDelay = 2000; // 5s
+    timeoutBetweenPulls = 1000, // 1s
+    timeoutDelay = 5000; // 5s
 
 
-analyzeFaction('auren');
+// analyzeFaction('auren');
+analyzeFactions();
 
+function analyzeFactions() {
+    console.log("analyze factions");
+    analyzeFaction('auren')
+    .then(x => analyzeFaction('witches'))
+    .then(x => analyzeFaction('engineers'))
+    .then(x => analyzeFaction('dwarves'))
+    .then(x => analyzeFaction('mermaids'))
+    .then(x => analyzeFaction('swarmlings'))
+    .then(x => analyzeFaction('darklings'))
+    .then(x => analyzeFaction('alchemists'))
+    .then(x => analyzeFaction('halflings'))
+    .then(x => analyzeFaction('cultists'))
+    .then(x => analyzeFaction('nomads'))
+    .then(x => analyzeFaction('fakirs'))
+    .then(x => analyzeFaction('giants'))
+    .then(x => analyzeFaction('chaosmagicians'))
+    .then(x => console.log("done"))
+    .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
+}
 
-function analyzeFaction(faction) { 
-    getFactionGames(faction)
-    .then(x => getGameData(x, faction))
-    .then(x => analyzeGames(x, faction))
-    // .then(uploadFactionResults)
-    .then(console.dir)
-    .catch(console.log);
+function analyzeFaction(faction) {
+    return new Promise(function(resolve, reject) { 
+        console.log("start download for: " + faction);
+        getFactionGames(faction)
+        .then(x => getGameData(x, faction))
+        .then(x => analyzeGames(x, faction))
+        .then(x => uploadFactionResults(x, faction))
+        .then(x => { console.log(x); return x; })
+        .then(resolve)
+        .catch(resolve); // always keep uploading
+    });
 }
 
 function getFactionGames(faction) { 
@@ -46,18 +70,17 @@ function getGameData(gameList, faction) {
             var timeout = i * timeoutBetweenPulls;
             setTimeout(() => { 
                 pullGame(game.id, faction)
-                .then(x => { gameData.push(x); console.log("pulled: " + game.id); })
+                .then(x => gameData.push(x))
                 .catch(console.log);
             }, timeout, game);
         }
-        setTimeout(() => { resolve(gameData) }, i * timeoutBetweenPulls + timeoutDelay);
+        setTimeout(() => resolve(gameData), i * timeoutBetweenPulls + timeoutDelay);
     });
 }
 
 function pullGame(game, faction) { 
     return new Promise(function(resolve, reject) { 
         var q = "select c." + faction + " from c where c.id = '" + game + "'";
-        console.log(q);
         var collLink = 'dbs/dev/colls/games';
         client.queryDocuments(collLink, q).toArray(function(err, results) { 
             if(err) { reject({ step: "pull game", err: err, game: game }); }
@@ -76,8 +99,19 @@ function analyzeGames(gameData, faction) {
         );
         obj.network = createHistogram(
             _.map(gameData, x => x.simple.endGameNetwork), 
-            {bucketsize: 6, type: 'auto', labels: 'exact'}
+            { // options
+                type: 'manual', 
+                buckets: [
+                    { min: 0, max: 2, label: 'last'}, // 0
+                    { min: 3, max: 8, label: '3rd'}, // 3 and 6
+                    { min: 9, max: 14, label: '2nd'}, // 9 and 12
+                    { min: 15, max: 18, label: '1st'}, // 15 and 18
+                ]
+            }
         );
+        obj.cult = createHistogram(
+            _.map(gameData, x => x.simple.endGameCult), 
+            {bucketsize: 4, type: 'auto', labels: 'range'});
 
         resolve(obj);
     });
@@ -104,19 +138,38 @@ function createHistogram(scores, options) {
             }));
         }
     } else if(options.type == 'manual') {
+        var counts = _.countBy(scores, x => { 
+            if(isNaN(x)) { x = 0; } // is this legal?
+            for(var i = 0; i < options.buckets.length; i++) {
+                var b = options.buckets[i];
+                if(x >= b.min && x <= b.max) { 
+                    return b.label;
+                }
+            }
+            return "uncategorized";
+        });
+
+        var ordering = { "uncategorized": options.buckets.length };
+        _.each(options.buckets, (b,i) => ordering[b.label] = i);
+
+        return  _.map(_.keys(counts), 
+            x => ({ order: ordering[x], key: x, value: counts[x] })
+        );
 
     } else { 
         throw "type must be 'auto' or 'manual'";
     }
 }
 
-function uploadFactionResults(data) { 
+// function makeHistogramForFactionPoints(gameData, )
+
+function uploadFactionResults(data, faction) { 
     return new Promise(function(resolve, reject) { 
         var collLink = 'dbs/dev/colls/factions';
         client.upsertDocument(collLink, data, function(err, document) {
             if(err) { reject({ step: "upload", err: err }); }
             else { 
-                resolve({ success: true })
+                resolve({ success: true, faction: faction })
             }
         });
     });

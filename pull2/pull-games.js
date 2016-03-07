@@ -14,10 +14,17 @@ var DocumentClient = require('documentdb').DocumentClient,
 
 var gameFile = argv['f'],
     logFile = argv['l'] || 'run.tmp',
+    deleteFlag = argv['d'],
     timeBetweenPulls = 30000, //30s
     timeBetweenDeletes = 2000, //2s
     host = azureInfo.host,
     masterKey = azureInfo.masterKey; //30s
+
+if(deleteFlag) { 
+    deleteFromFile(gameFile);
+} else { 
+    pullFromFile(gameFile, logFile);
+}
 
 // pullFromFile(gameFile, logFile);
 
@@ -25,17 +32,17 @@ var gameFile = argv['f'],
 
 
 
-pullGame("4pLeague_S10_D3L3_G6")
-.then(loadGame)
-.then(function(game) { return logStatus(game, logFile); })
-.then(function(status) {
-    console.log("success: " + status.game);
-})
-.catch(function(status) { 
-    console.dir(status);
-    console.log("failure: " + status.game + " || " + status.step);
-    console.dir(status.err)
-});
+// pullGame("4pLeague_S10_D3L3_G6")
+// .then(loadGame)
+// .then(function(game) { return logStatus(game, logFile); })
+// .then(function(status) {
+//     console.log("success: " + status.game);
+// })
+// .catch(function(status) { 
+//     console.dir(status);
+//     console.log("failure: " + status.game + " || " + status.step);
+//     console.dir(status.err)
+// });
 
 
 
