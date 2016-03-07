@@ -102,7 +102,7 @@ function analyzeGames(gameData, faction) {
             { // options
                 type: 'manual', 
                 buckets: [
-                    { min: 0, max: 2, label: 'last'}, // 0
+                    { min: 0, max: 2, label: 'no points'}, // 0
                     { min: 3, max: 8, label: '3rd'}, // 3 and 6
                     { min: 9, max: 14, label: '2nd'}, // 9 and 12
                     { min: 15, max: 18, label: '1st'}, // 15 and 18
