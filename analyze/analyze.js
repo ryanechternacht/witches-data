@@ -31,7 +31,8 @@ function analyzeFactions() {
     .then(x => analyzeFaction('fakirs'))
     .then(x => analyzeFaction('giants'))
     .then(x => analyzeFaction('chaosmagicians'))
-    .then(x => console.log("done"))
+    .then(x => analyzeAllFactions())
+    .then(console.log)
     .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
 }
 
@@ -42,15 +43,26 @@ function analyzeFaction(faction) {
         .then(x => getGameData(x, faction))
         .then(x => analyzeGames(x, faction))
         .then(x => uploadFactionResults(x, faction))
-        .then(x => { console.log(x); return x; })
         .then(resolve)
-        .catch(resolve); // always keep uploading
+        .catch(x => { console.log(x); resolve(x); }); // always keep uploading
+    });
+}
+
+function analyzeAllFactions() {
+    return new Promise(function(resolve, reject) { 
+        console.log("start download for: all factions");
+        getAllGames()
+        .then(getGameDataForAllFactions)
+        .then(x => analyzeGames(x, "all"))
+        .then(x => uploadFactionResults(x, "all"))
+        .then(resolve)
+        .catch(x => { console.log(x); resolve(x); }); // always keep uploading
     });
 }
 
 function getFactionGames(faction) { 
     return new Promise(function(resolve, reject) { 
-        var q = "SELECT c.id from c where array_contains(c.factions, '" + faction + "')"
+        var q = "SELECT c.id from c where array_contains(c.factions, '" + faction + "')";
         var collLink = 'dbs/dev/colls/games';
         client.queryDocuments(collLink, q).toArray(function(err, results) { 
             if(err) { 
@@ -61,20 +73,62 @@ function getFactionGames(faction) {
     });
 }
 
+function getAllGames() { 
+    return new Promise(function(resolve, reject) { 
+        var q = "SELECT c.id, c.factions from c";
+        var collLink = 'dbs/dev/colls/games';
+        client.queryDocuments(collLink, q).toArray(function(err, results) { 
+            if(err) { 
+                reject({ step: "pull games", err: err });
+            }
+            resolve(results);
+        });
+    });
+}
+
+// gameList is { id }[]
 function getGameData(gameList, faction) { 
     return new Promise(function(resolve, reject) { 
         var i = 0; 
         var gameData = [];
         for(/* i */; i < gameList.length; i++) { 
             let game = gameList[i];
+            let j = i;
             var timeout = i * timeoutBetweenPulls;
             setTimeout(() => { 
                 pullGame(game.id, faction)
                 .then(x => gameData.push(x))
+                .then(x => console.log(game, j))
                 .catch(console.log);
             }, timeout, game);
         }
         setTimeout(() => resolve(gameData), i * timeoutBetweenPulls + timeoutDelay);
+    });
+}
+
+// gamelist is { id, factions[] }[]
+function getGameDataForAllFactions(gameList) {
+    return new Promise(function(resolve, reject) { 
+        var gameData = [];
+        var count = 0; 
+        for(var i = 0; i < gameList.length; i++) { 
+            let game = gameList[i];
+            for(var j = 0; j < game.factions.length; j++) {
+                let faction = j;
+                var timeout = count * timeoutBetweenPulls;
+                count++;
+                let current = count;
+
+                //TODO change below to grab each faction from game
+                setTimeout(() => { 
+                    pullGame(game.id, game.factions[faction])
+                    .then(x => gameData.push(x))
+                    .then(x => console.log(game.id, game.factions[faction], current))
+                    .catch(console.log);
+                }, timeout, game);
+            }
+        }
+        setTimeout(() => resolve(gameData), count * timeoutBetweenPulls + timeoutDelay);
     });
 }
 
@@ -161,15 +215,14 @@ function createHistogram(scores, options) {
     }
 }
 
-// function makeHistogramForFactionPoints(gameData, )
-
 function uploadFactionResults(data, faction) { 
     return new Promise(function(resolve, reject) { 
+        console.log(data);
         var collLink = 'dbs/dev/colls/factions';
         client.upsertDocument(collLink, data, function(err, document) {
             if(err) { reject({ step: "upload", err: err }); }
             else { 
-                resolve({ success: true, faction: faction })
+                resolve({ success: true, faction: faction });
             }
         });
     });
