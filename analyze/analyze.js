@@ -37,8 +37,9 @@ function analyzeFactions() {
 }
 
 function analyzeFaction(faction) {
+    console.log("analyzeFaction", faction);
+
     return new Promise(function(resolve, reject) { 
-        console.log("start download for: " + faction);
         getFactionGames(faction)
         .then(x => getGameData(x, faction))
         .then(x => analyzeGames(x, faction))
@@ -49,6 +50,8 @@ function analyzeFaction(faction) {
 }
 
 function analyzeAllFactions() {
+    console.log("analyzeAllFactions");
+
     return new Promise(function(resolve, reject) { 
         console.log("start download for: all factions");
         getAllGames()
@@ -61,6 +64,8 @@ function analyzeAllFactions() {
 }
 
 function getFactionGames(faction) { 
+    console.log("getFactionsGames", faction);
+
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id from c where array_contains(c.factions, '" + faction + "')";
         var collLink = 'dbs/dev/colls/games';
@@ -74,6 +79,8 @@ function getFactionGames(faction) {
 }
 
 function getAllGames() { 
+    console.log("getAllGames");
+
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id, c.factions from c";
         var collLink = 'dbs/dev/colls/games';
@@ -88,6 +95,8 @@ function getAllGames() {
 
 // gameList is { id }[]
 function getGameData(gameList, faction) { 
+    console.log("getGameData", faction);
+
     return new Promise(function(resolve, reject) { 
         var i = 0; 
         var gameData = [];
@@ -108,6 +117,8 @@ function getGameData(gameList, faction) {
 
 // gamelist is { id, factions[] }[]
 function getGameDataForAllFactions(gameList) {
+    console.log("getGameDataForAllFactions", faction);
+
     return new Promise(function(resolve, reject) { 
         var gameData = [];
         var count = 0; 
@@ -144,6 +155,8 @@ function pullGame(game, faction) {
 }
 
 function analyzeGames(gameData, faction) { 
+    console.log("analyzeGames", faction);
+
     return new Promise(function(resolve, reject) { 
         var obj = { id: faction, faction: faction };
 
@@ -162,6 +175,10 @@ function analyzeGames(gameData, faction) {
                     { min: 15, max: 18, label: '1st'}, // 15 and 18
                 ]
             }
+        );
+        obj.buildings = createHistogram(
+            _.map(gameData, x => x.d + x.tp + x.te + x.sh + x.sa), 
+            { bucketsize: 1, type: 'auto', labels: 'exact'}
         );
         obj.cult = createHistogram(
             _.map(gameData, x => x.simple.endGameCult), 
@@ -216,6 +233,8 @@ function createHistogram(scores, options) {
 }
 
 function uploadFactionResults(data, faction) { 
+    console.log("uploadFactionResults", faction);
+
     return new Promise(function(resolve, reject) { 
         console.log(data);
         var collLink = 'dbs/dev/colls/factions';
