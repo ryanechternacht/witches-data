@@ -17,7 +17,10 @@ analyzeFactions();
 
 function analyzeFactions() {
     console.log("analyze factions");
-    analyzeFaction('auren')
+    Promise.resolve() 
+    .then(x => analyzeFaction('fakirs'))
+    .then(x => analyzeFaction('nomads'))
+    .then(x => analyzeFaction('auren'))
     .then(x => analyzeFaction('witches'))
     .then(x => analyzeFaction('engineers'))
     .then(x => analyzeFaction('dwarves'))
@@ -27,8 +30,6 @@ function analyzeFactions() {
     .then(x => analyzeFaction('alchemists'))
     .then(x => analyzeFaction('halflings'))
     .then(x => analyzeFaction('cultists'))
-    .then(x => analyzeFaction('nomads'))
-    .then(x => analyzeFaction('fakirs'))
     .then(x => analyzeFaction('giants'))
     .then(x => analyzeFaction('chaosmagicians'))
     .then(x => analyzeAllFactions())
@@ -183,6 +184,7 @@ function analyzeGames(gameData, faction) {
         obj.cult = createHistogram(
             _.map(gameData, x => x.simple.endGameCult), 
             {bucketsize: 4, type: 'auto', labels: 'range'});
+        obj.games = gameData.length;
 
         resolve(obj);
     });
