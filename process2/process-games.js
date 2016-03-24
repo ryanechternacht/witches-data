@@ -101,7 +101,8 @@ function parseGame(rawGame, gameName) {
             name: gameName,
             rounds: engineSetup.rounds,
             fireAndIceBonus: engineSetup.fireAndIceBonus,
-            gameComplete: gameComplete
+            gameComplete: gameComplete,
+            bonuses: engineSetup.bonuses
         };
 
         obj.factions = _.map(scoreCards, x => x.faction);
