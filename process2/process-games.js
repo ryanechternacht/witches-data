@@ -132,10 +132,10 @@ function scheduleDeletes(gameList) {
                 // console.log('start pull for: ' + game);
                 deleteGame(game)
                 .then(function(status) {
-                    console.log("successfully deleted: " + status.game);
+                    console.log("successfully deleted:", status.game.id);
                 })
                 .catch(function(status) { 
-                    console.log("failure on delete: " + status.game);
+                    console.log("failure on delete:", status.game.id);
                     console.log(status.err);
                 });
             }, timeout, game);

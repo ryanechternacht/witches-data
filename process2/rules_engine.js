@@ -62,6 +62,7 @@ module.exports = (function() {
         // other options?
 
         var rounds = [],
+            bonuses = ['bon1', 'bon2', 'bon3', 'bon4', 'bon5', 'bon6', 'bon7', 'bon8', 'bon9'],
             players = [],
             options = [],
             fireAndIceBonus = null,
@@ -82,6 +83,11 @@ module.exports = (function() {
                 });
             }
 
+            if(parsedAction.setup.bonus != undefined) { 
+                var index = bonuses.indexOf(parsedAction.setup.bonus.toLowerCase());
+                bonuses.splice(index, 1);
+            }
+
             if(parsedAction.setup.player != undefined) { 
                 var order = names.length;
                 names.push({
@@ -98,12 +104,19 @@ module.exports = (function() {
                 var name = names.shift();
                 players.push(makePlayer(name, action.faction));
             }
+
+            if(parsedAction.setup.option != undefined) { 
+                if(parsedAction.setup.option.toLowerCase() === "mini-expansion-1") {
+                    bonuses.push('bon10');
+                }
+            }
         }
 
         return {
             rounds: rounds,
             players: players, 
             options: [],
+            bonuses: bonuses,
             fireAndIceBonus: fireAndIceBonus,
         };
     }
@@ -227,6 +240,7 @@ module.exports = (function() {
             fav10: false,
             fav11: false,
             fav12: false,
+            favors: [],
             passBonus: '',
             shipLevel: shipStart,
             shipLevels: shipLevels,
@@ -520,6 +534,7 @@ module.exports = (function() {
                 else if(f == 12) { 
                     player.fav12 = true;
                 }
+                player.favors.push("fav" + f);
             }
         }
 
@@ -1471,4 +1486,11 @@ module.exports = (function() {
         return null;
     }
     /// END RULES
-})();
+)();
+
+
+
+
+
+
+

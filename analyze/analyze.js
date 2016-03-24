@@ -118,7 +118,7 @@ function getGameData(gameList, faction) {
 
 // gamelist is { id, factions[] }[]
 function getGameDataForAllFactions(gameList) {
-    console.log("getGameDataForAllFactions", faction);
+    console.log("getGameDataForAllFactions");
 
     return new Promise(function(resolve, reject) { 
         var gameData = [];
@@ -185,6 +185,11 @@ function analyzeGames(gameData, faction) {
             _.map(gameData, x => x.simple.endGameCult), 
             {bucketsize: 4, type: 'auto', labels: 'range'});
         obj.games = gameData.length;
+        obj.favors = createFavorsHistogram(_.map(gameData, x => x.favors));
+        obj.pickOrder = createHistogram(
+            _.map(gameData, x => x.startOrder + 1), // startOrder is 0-indexed 
+            {bucketsize: 1, type: 'auto', labels: 'exact'}
+        );
 
         resolve(obj);
     });
@@ -232,6 +237,27 @@ function createHistogram(scores, options) {
     } else { 
         throw "type must be 'auto' or 'manual'";
     }
+}
+
+function createFavorsHistogram(favors) { 
+    //[{key,order,value}]
+    var favs = ["fav1", "fav2", "fav3", "fav4", "fav5", "fav6", 
+                "fav7", "fav8", "fav9", "fav10", "fav11", "fav12"];
+
+    var obj = [];
+
+    console.log(favors[0]);
+
+    for(var i = 0; i < favs.length; i++) { 
+        var fav = favs[i];
+
+        var count = _.filter(favors, x => _.includes(x, fav)).length;
+
+        obj.push({ key: fav, order: i, value: count });
+    }
+
+    return obj;
+
 }
 
 function uploadFactionResults(data, faction) { 
