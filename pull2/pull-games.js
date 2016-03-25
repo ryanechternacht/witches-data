@@ -16,7 +16,7 @@ var gameFile = argv['f'],
     logFile = argv['l'] || 'run.tmp',
     deleteFlag = argv['d'],
     timeBetweenPulls = 30000, //30s
-    timeBetweenDeletes = 2000, //2s
+    timeBetweenDeletes = 1000, //2s
     host = azureInfo.host,
     masterKey = azureInfo.masterKey; //30s
 
@@ -25,26 +25,6 @@ if(deleteFlag) {
 } else { 
     pullFromFile(gameFile, logFile);
 }
-
-// pullFromFile(gameFile, logFile);
-
-// deleteFromFile(gameFile);
-
-
-
-// pullGame("4pLeague_S10_D3L3_G6")
-// .then(loadGame)
-// .then(function(game) { return logStatus(game, logFile); })
-// .then(function(status) {
-//     console.log("success: " + status.game);
-// })
-// .catch(function(status) { 
-//     console.dir(status);
-//     console.log("failure: " + status.game + " || " + status.step);
-//     console.dir(status.err)
-// });
-
-
 
 function pullFromFile(gameFile, logFile) {
     setupLogFile(logFile)
@@ -80,14 +60,13 @@ function scheduleLoads(load, logFile) {
                 // console.log('start pull for: ' + game);
                 pullGame(game)
                 .then(loadGame)
-                .then(function(game) { return logStatus(game, logFile); })
+                .then(function(game) { return logSuccess(game, logFile); })
                 .then(function(status) {
                     console.log("success: " + status.game);
                 })
                 .catch(function(status) { 
-                    console.dir(status);
+                    logFailure({game: game, issue: status}, logFile);
                     console.log("failure: " + status.game + " || " + status.step);
-                    console.dir(status.err)
                 });
             }, timeout, game);
         }
@@ -212,7 +191,7 @@ function setupLogFile(file) {
     return new Promise(function(resolve, reject) { 
         var p = path.join(__dirname, file);
 
-        var obj = { results: [] };
+        var obj = { success: [], failure: [] };
         var s = JSON.stringify(obj);
 
         fs.writeFile(p, s, function(err, data) { 
@@ -224,7 +203,7 @@ function setupLogFile(file) {
     });
 }
 
-function logStatus(status, file) { 
+function logSuccess(status, file) { 
     return new Promise(function(resolve, reject) { 
         var p = path.join(__dirname, file);
 
@@ -232,7 +211,7 @@ function logStatus(status, file) {
             if(err) { reject(err); }
             else { 
                 var log = JSON.parse(data);
-                log.results.push(status);
+                log.success.push(status);
                 var s = JSON.stringify(log);
                 fs.writeFile(p, s, function(err2, data2) { 
                     if(err2) { reject(err2); }
@@ -243,6 +222,25 @@ function logStatus(status, file) {
     });
 }
 
+
+function logFailure(status, file) { 
+    return new Promise(function(resolve, reject) { 
+        var p = path.join(__dirname, file);
+
+        fs.readFile(p, function(err, data) { 
+            if(err) { reject(err); }
+            else { 
+                var log = JSON.parse(data);
+                log.failure.push(status);
+                var s = JSON.stringify(log);
+                fs.writeFile(p, s, function(err2, data2) { 
+                    if(err2) { reject(err2); }
+                    else { resolve(status); }
+                });
+            }
+        });
+    });
+}
 
 
 
