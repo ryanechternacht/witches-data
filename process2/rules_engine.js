@@ -52,7 +52,8 @@ module.exports = (function() {
     return { 
         setupEngine: setupEngine,
         processCommands: processCommands,
-        checkGameComplete: checkGameComplete
+        checkGameComplete: checkGameComplete,
+        buildGameResults: buildGameResults
     };
 
 
@@ -92,7 +93,7 @@ module.exports = (function() {
                 var order = names.length;
                 names.push({
                     name: parsedAction.setup.player.name, 
-                    startOrder: order
+                    startOrder: order + 1
                 });
             }
 
@@ -161,6 +162,8 @@ module.exports = (function() {
             sumPoints(players[i]);
         }
 
+        buildGameResults(players);
+
         return players;
     }
 
@@ -173,6 +176,16 @@ module.exports = (function() {
         }
 
         return false; // if we don't find an endGame action
+    }
+
+    function buildGameResults(scoreCards) { 
+        var ordered = _.sortBy(scoreCards, x => 'total').reverse();
+        return _.map(ordered, (x,i) => ({
+            faction: x.faction, 
+            player: x.name,
+            startOrder: x.startOrder,
+            place: i + 1
+        }))  
     }
     /// END PUBLIC
 
