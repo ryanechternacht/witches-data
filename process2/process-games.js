@@ -6,33 +6,94 @@ var parser = require('./parse.js'),
     azureInfo = require('../secret/azureinfo.js'),
     argv = require('minimist')(process.argv.slice(2)),
     Promise = require('promise'),
-    _ = require('underscore');
+    _ = require('underscore'),
+    fs = require('fs'),
+    path = require('path'),
+    semaphore = require('semaphore')(1);
 
 var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
     client = new DocumentClient(host, {masterKey: masterKey}),
     timeBetweenParses = 5000, //5s
-    timeBetweenDeletes = 2000, //2s
-    logFile = argv['l'] || 'run.tmp';
+    timeBetweenDeletes = 1000, //2s
+    logFile = argv['l'] || 'run.tmp',
+    deleteFlag = argv['d'],
+    gameList = argv['f'];
 
 
+// if(deleteFlag) {
+//     setupLogFile(logFile)
+//     .then(x => pullGameList())
+//     .then(x => scheduleDeletes(x, logFile))
+//     .then(console.log)
+//     .catch(console.dir);
+// }
+// else {
+//     setupLogFile(logFile)
+//     .then(x => pullGameList())
+//     .then(x => scheduleParses(x, logFile))
+//     .then(console.log)
+//     .catch(console.dir);
+// }
 
-pullGameList()
-.then(function(x) { return scheduleParses(x, logFile); })
-.then(console.log)
-.catch(console.dir);
+// var p = path.join(__dirname, "run.tmp");
+// fs.readFile(p, function(err, data) { 
+//     if(err) { reject(err); }
+//     else { 
+//         var log = JSON.parse(data);
+//         console.log(log.success.length);
+//         console.log(log.failure.length);
 
+//         var s = "";
+//         for(var i = 0; i < log.success.length; i++) { 
+//             s += log.success[i].game + "\n";
+//         }
+//         var ps = path.join(__dirname, "success.tmp");
+//         fs.writeFile(ps, s, function(e, d) { });
 
+//         var f = "";
+//         for(var i = 0; i < log.failure.length; i++) { 
+//             f += log.failure[i].game + "\n";
+//         }
+//         var pf = path.join(__dirname, "failure.tmp");
+//         fs.writeFile(pf, f, function(e, d) { });
+//     }
+// });
 
-// pullGame({id: "4pLeague_S10_D3L3_G6"})
-// .then(x => parseGame(x, "4pLeague_S10_D3L3_G6"))
-// .then(uploadGame)
+// setupLogFile(logFile)
+// .then(x => loadGameList(gameList))
+// .then(x => scheduleParses(x, logFile))
 // .then(console.log)
 // .catch(console.dir);
 
-// deleteGame({id: "4pLeague_S10_D3L3_G6"})
-// .then(console.log)
-// .catch(console.dir);
+
+
+// var docLink = 'dbs/snellman/colls/games/docs/4pLeague_S1_D2L2_G1';
+
+// client.readAttachments(docLink).toArray(function(err, results) {
+//     if(err) { console.log("failure attachment"); console.log(err); }
+//     else {
+//         var attach = results[0];
+//         var mediaLink = attach.media;
+//         client.readMedia(mediaLink, function(err2, attachment) { 
+//             if(err2) { console.log("failure media"); console.log(err2); } 
+//             else { 
+//                 var a = JSON.parse(attachment);
+//                 // console.dir(a.ledger.length);
+//                 parseGame(a, '4pLeague_S1_D2L2_G1')
+//                 .then(console.log)
+//                 .catch(console.log);
+//             }
+//         });
+//     }
+// });
+
+var docLink = 'dbs/snellman/colls/games/docs/onion';
+client.deleteDocument(docLink, function(err, doc) { 
+    if(err) { console.log(err); }
+    else { console.log(doc); }
+});
+
 
 function pullGameList() { 
     return new Promise(function(resolve, reject) { 
@@ -42,6 +103,22 @@ function pullGameList() {
             .toArray(function(err, results) { 
                 if(err) { reject({ step: "pull game list", err: err }); }
                 else { resolve(results); }
+        });
+    });
+}
+
+function loadGameList(file) { 
+    return new Promise(function(resolve, reject) { 
+        var p = path.join(__dirname, file);
+
+        fs.readFile(p, function(err, data) { 
+            if(err) { 
+                reject(err);
+            } else { 
+                var obj = JSON.parse(data);
+                var modified = _.map(obj.games, x => ({id:x, name:x}));
+                resolve(modified);
+            }
         });
     });
 }
@@ -56,8 +133,12 @@ function scheduleParses(gameList, logFile) {
                 pullGame(game.id)
                 .then(x => parseGame(x, game.id))
                 .then(uploadGame)
-                .then(console.log)
-                .catch(console.dir);
+                .then(x => logSuccess(x, logFile))
+                .then(x => console.log("sucess: ", x.game))
+                .catch(x => {
+                    logFailure({game: game.id, issue: x}, logFile);
+                    console.log("failure", game);
+                });
             }, timeout, game);
         }
         setTimeout(() => resolve("success"), i * timeBetweenParses);
@@ -67,6 +148,9 @@ function scheduleParses(gameList, logFile) {
 function pullGame(gameName) { 
     return new Promise(function(resolve, reject) { 
         var docLink = 'dbs/snellman/colls/games/docs/' + gameName;
+
+        var client = new DocumentClient(host, {masterKey: masterKey});
+
 
         client.readAttachments(docLink).toArray(function(err, results) { 
             if(err) { reject({ step: "pull game", err: err, game: gameName }); }
@@ -123,22 +207,17 @@ function uploadGame(gameObj) {
     });
 }
 
-function scheduleDeletes(gameList) { 
+function scheduleDeletes(gameList, logFile) { 
     return new Promise(function(resolve, reject) { 
         var i = 0;
         for(/* i */; i < gameList.length; i++) { 
             let game = gameList[i];
             var timeout = i * timeBetweenDeletes;
             setTimeout(function() { 
-                // console.log('start pull for: ' + game);
                 deleteGame(game)
-                .then(function(status) {
-                    console.log("successfully deleted:", status.game.id);
-                })
-                .catch(function(status) { 
-                    console.log("failure on delete:", status.game.id);
-                    console.log(status.err);
-                });
+                .then(x => logSuccess(x, logFile))
+                .then(x => console.log("sucess: ", x.game))
+                .catch(x => logFailure({game: game, issue: x}, logFile));
             }, timeout, game);
         }
         setTimeout(function() { 
@@ -152,10 +231,85 @@ function deleteGame(game) {
         var docLink = 'dbs/dev/colls/games/docs/' + game.id;
         client.deleteDocument(docLink, function(err, doc) { 
             if(err) { reject({ game: game, err: err, success: false }); }
-            else { resolve({ game: game, success: true }); }
+            else {  resolve({ game: game, success: true }); }
+        });
+    });
+}
+
+function setupLogFile(file) { 
+        return new Promise(function(resolve, reject) { 
+            var p = path.join(__dirname, file);
+
+            var obj = { success: [], failure: [] };
+            var s = JSON.stringify(obj);
+
+            fs.writeFile(p, s, function(err, data) { 
+                if(err) { reject(err); }
+                else { 
+                    resolve(s);
+                }
+            });
+        });
+}
+
+function logSuccess(status, file) { 
+    return new Promise(function(resolve, reject) { 
+        semaphore.take(() => {
+            var p = path.join(__dirname, file);
+
+            fs.readFile(p, function(err, data) { 
+                if(err) { 
+                    semaphore.leave();
+                    reject(err); 
+                }
+                else { 
+                    var log = JSON.parse(data);
+                    log.success.push(status);
+                    var s = JSON.stringify(log);
+                    fs.writeFile(p, s, function(err2, data2) { 
+                        if(err2) { 
+                            semaphore.leave();
+                            reject(err2); 
+                        }
+                        else { 
+                            semaphore.leave();
+                            resolve(status); 
+                        }
+                    });
+                }
+            });
         });
     });
 }
 
 
+function logFailure(status, file) { 
+    return new Promise(function(resolve, reject) { 
+        semaphore.take(() => {   
+            var p = path.join(__dirname, file);
+
+            fs.readFile(p, function(err, data) { 
+                if(err) { 
+                    semaphore.leave();
+                    reject(err); 
+                }
+                else { 
+                    var log = JSON.parse(data);
+                    log.failure.push(status);
+                    var s = JSON.stringify(log);
+                    fs.writeFile(p, s, function(err2, data2) { 
+                        if(err2) { 
+                            semaphore.leave();
+                            reject(err2); 
+                        }
+                        else { 
+                            semaphore.leave();
+                            resolve(status); 
+                        }
+                    });
+                }
+            });
+        });
+    });
+}
 

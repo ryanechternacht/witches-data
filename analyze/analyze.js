@@ -12,8 +12,26 @@ var host = azureInfo.host,
     timeoutDelay = 5000; // 5s
 
 
-// analyzeFaction('auren');
-analyzeFactions();
+// var q = "select * from c where c.id = '" + 'auren' + "'";
+// var collLink = 'dbs/dev/colls/factions';
+// client.queryDocuments(collLink, q).toArray(function(err, results) { 
+//     if(err) { console.log(err); }
+//     else { console.log(results); }
+// });
+
+var q = "select * from c where c.id = '4pLeague_S10_D2L2_G1'";
+var collLink = 'dbs/dev/colls/games';
+client.queryDocuments(collLink, q).toArray(function(err, results) { 
+    if(err) { console.log(err); }
+    else { console.log(results); }
+});
+
+// analyzeAllFactions()
+// .then(console.log)
+// .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
+
+
+// analyzeFactions();
 
 function analyzeFactions() {
     console.log("analyze factions");
@@ -38,7 +56,7 @@ function analyzeFactions() {
 }
 
 function analyzeFaction(faction) {
-    console.log("analyzeFaction", faction);
+    console.log(faction);
 
     return new Promise(function(resolve, reject) { 
         getFactionGames(faction)
@@ -51,7 +69,7 @@ function analyzeFaction(faction) {
 }
 
 function analyzeAllFactions() {
-    console.log("analyzeAllFactions");
+    console.log("all");
 
     return new Promise(function(resolve, reject) { 
         console.log("start download for: all factions");
@@ -65,8 +83,6 @@ function analyzeAllFactions() {
 }
 
 function getFactionGames(faction) { 
-    console.log("getFactionsGames", faction);
-
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id from c where array_contains(c.factions, '" + faction + "')";
         var collLink = 'dbs/dev/colls/games';
@@ -80,8 +96,6 @@ function getFactionGames(faction) {
 }
 
 function getAllGames() { 
-    console.log("getAllGames");
-
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id, c.factions from c";
         var collLink = 'dbs/dev/colls/games';
@@ -96,8 +110,6 @@ function getAllGames() {
 
 // gameList is { id }[]
 function getGameData(gameList, faction) { 
-    console.log("getGameData", faction);
-
     return new Promise(function(resolve, reject) { 
         var i = 0; 
         var gameData = [];
@@ -118,8 +130,6 @@ function getGameData(gameList, faction) {
 
 // gamelist is { id, factions[] }[]
 function getGameDataForAllFactions(gameList) {
-    console.log("getGameDataForAllFactions");
-
     return new Promise(function(resolve, reject) { 
         var gameData = [];
         var count = 0; 
@@ -156,14 +166,12 @@ function pullGame(game, faction) {
 }
 
 function analyzeGames(gameData, faction) { 
-    console.log("analyzeGames", faction);
-
     return new Promise(function(resolve, reject) { 
         var obj = { id: faction, faction: faction };
 
         obj.total = createHistogram(
             _.map(gameData, x => x.total), 
-            {bucketsize: 10, type: 'auto', labels: 'range'}
+            {bucketsize: 10, type: 'auto', labels: 'decades'}
         );
         obj.network = createHistogram(
             _.map(gameData, x => x.simple.endGameNetwork), 
@@ -187,7 +195,7 @@ function analyzeGames(gameData, faction) {
         obj.games = gameData.length;
         obj.favors = createFavorsHistogram(_.map(gameData, x => x.favors));
         obj.pickOrder = createHistogram(
-            _.map(gameData, x => x.startOrder + 1), // startOrder is 0-indexed 
+            _.map(gameData, x => x.startOrder), // startOrder is 0-indexed 
             {bucketsize: 1, type: 'auto', labels: 'exact'}
         );
 
@@ -213,6 +221,12 @@ function createHistogram(scores, options) {
                 order: i, 
                 value: counts[x], 
                 key: x + "-" + (x+options.bucketsize-1)
+            }));
+        } else if(options.labels == 'decades') { 
+            return _.map(ordered, (x, i) => ({
+                order: i,
+                value: counts[x],
+                key: x + "'s"
             }));
         }
     } else if(options.type == 'manual') {
@@ -261,8 +275,6 @@ function createFavorsHistogram(favors) {
 }
 
 function uploadFactionResults(data, faction) { 
-    console.log("uploadFactionResults", faction);
-
     return new Promise(function(resolve, reject) { 
         console.log(data);
         var collLink = 'dbs/dev/colls/factions';

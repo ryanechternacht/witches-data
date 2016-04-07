@@ -694,7 +694,7 @@ String
   = characters:[a-z0-9]i+ { return a2s(characters); }
 
 OptionString
-  = characters:[a-z0-9-/.:]i+ { return a2s(characters); }
+  = characters:[a-z0-9-/.:_]i+ { return a2s(characters); }
 
 Number
   = digits:[0-9]+ { return parseInt(a2s(digits),10); }

@@ -8,7 +8,6 @@ var DocumentClient = require('documentdb').DocumentClient,
     http = require('http'),
     Promise = require('promise'),
     fs = require('fs'),
-    semaphore = require('semaphore')(1),
     path = require('path');
 
 
@@ -20,11 +19,69 @@ var gameFile = argv['f'],
     host = azureInfo.host,
     masterKey = azureInfo.masterKey; //30s
 
-if(deleteFlag) { 
-    deleteFromFile(gameFile);
-} else { 
-    pullFromFile(gameFile, logFile);
-}
+var client = new DocumentClient(host, {masterKey: masterKey});
+
+// var q = "SELECT * from c where c.id = '4pLeague_S1_D2L2_G1'";
+// var collLink = 'dbs/snellman/colls/games';
+// client.queryDocuments(collLink, q).toArray(function(err, results) { 
+//     if(err) { 
+//         console.log(err);
+//     } else { 
+//        console.log(results);
+//     }
+// });
+
+var docLink = 'dbs/snellman/colls/games/docs/4pLeague_S1_D2L2_G1';
+
+client.readAttachments(docLink).toArray(function(err, results) {
+    if(err) { console.log("failure attachment"); console.log(err); }
+    else {
+        var attach = results[0];
+        var mediaLink = attach.media;
+        client.readMedia(mediaLink, function(err2, attachment) { 
+            if(err2) { console.log("failure media"); console.log(err2); } 
+            else { 
+                var a = JSON.parse(attachment);
+                console.dir(a.ledger.length);
+            }
+        });
+    }
+});
+
+
+// deleteGame("onion")
+
+// if(deleteFlag) { 
+//     deleteFromFile(gameFile);
+// } else { 
+//     pullFromFile(gameFile, logFile);
+// }
+
+//  var p = path.join(__dirname, "run.tmp");
+// fs.readFile(p, function(err, data) { 
+//     if(err) { reject(err); }
+//     else { 
+//         var log = JSON.parse(data);
+//         console.log(log.success.length);
+//         console.log(log.failure.length);
+
+//         // var s = "";
+//         // for(var i = 0; i < log.success.length; i++) { 
+//         //     s += log.success[i].game + "\n";
+//         // }
+//         // var ps = path.join(__dirname, "success.tmp");
+//         // fs.writeFile(ps, s, function(e, d) { });
+
+//         // var f = "";
+//         // for(var i = 0; i < log.failure.length; i++) { 
+//         //     f += log.failure[i].game + "\n";
+//         // }
+//         // var pf = path.join(__dirname, "failure.tmp");
+//         // fs.writeFile(pf, f, function(e, d) { });
+//     }
+// });
+
+
 
 function pullFromFile(gameFile, logFile) {
     setupLogFile(logFile)
@@ -57,7 +114,6 @@ function scheduleLoads(load, logFile) {
             let game = load.games[i];
             var timeout = i * timeBetweenPulls;
             setTimeout(function() { 
-                // console.log('start pull for: ' + game);
                 pullGame(game)
                 .then(loadGame)
                 .then(function(game) { return logSuccess(game, logFile); })
@@ -158,7 +214,6 @@ function scheduleDeletes(file) {
             let game = file.games[i];
             var timeout = i * timeBetweenDeletes;
             setTimeout(function() { 
-                // console.log('start pull for: ' + game);
                 deleteGame(game)
                 .then(function(status) {
                     console.log("successfully deleted: " + status.game);
