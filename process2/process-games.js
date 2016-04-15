@@ -14,27 +14,27 @@ var parser = require('./parse.js'),
 var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
     client = new DocumentClient(host, {masterKey: masterKey}),
-    timeBetweenParses = 5000, //5s
-    timeBetweenDeletes = 1000, //2s
+    timeBetweenParses = 3000, //5s
+    timeBetweenDeletes = 1000, //1s
     logFile = argv['l'] || 'run.tmp',
     deleteFlag = argv['d'],
     gameList = argv['f'];
 
 
-// if(deleteFlag) {
-//     setupLogFile(logFile)
-//     .then(x => pullGameList())
-//     .then(x => scheduleDeletes(x, logFile))
-//     .then(console.log)
-//     .catch(console.dir);
-// }
-// else {
-//     setupLogFile(logFile)
-//     .then(x => pullGameList())
-//     .then(x => scheduleParses(x, logFile))
-//     .then(console.log)
-//     .catch(console.dir);
-// }
+if(deleteFlag) {
+    setupLogFile(logFile)
+    .then(x => pullGameList())
+    .then(x => scheduleDeletes(x, logFile))
+    .then(console.log)
+    .catch(console.dir);
+}
+else {
+    setupLogFile(logFile)
+    .then(x => pullGameList())
+    .then(x => scheduleParses(x, logFile))
+    .then(console.log)
+    .catch(console.dir);
+}
 
 // var p = path.join(__dirname, "run.tmp");
 // fs.readFile(p, function(err, data) { 
@@ -66,33 +66,27 @@ var host = azureInfo.host,
 // .then(console.log)
 // .catch(console.dir);
 
-
-
-// var docLink = 'dbs/snellman/colls/games/docs/4pLeague_S1_D2L2_G1';
-
-// client.readAttachments(docLink).toArray(function(err, results) {
-//     if(err) { console.log("failure attachment"); console.log(err); }
-//     else {
-//         var attach = results[0];
-//         var mediaLink = attach.media;
-//         client.readMedia(mediaLink, function(err2, attachment) { 
-//             if(err2) { console.log("failure media"); console.log(err2); } 
-//             else { 
-//                 var a = JSON.parse(attachment);
-//                 // console.dir(a.ledger.length);
-//                 parseGame(a, '4pLeague_S1_D2L2_G1')
-//                 .then(console.log)
-//                 .catch(console.log);
-//             }
-//         });
-//     }
+// var docLink = 'dbs/dev/colls/games/docs/4pLeague_S10_D2L2_G1';
+// client.deleteDocument(docLink, function(err, doc) { 
+//     if(err) { console.log(err); }
+//     else { console.log(doc); }
 // });
 
-var docLink = 'dbs/snellman/colls/games/docs/onion';
-client.deleteDocument(docLink, function(err, doc) { 
-    if(err) { console.log(err); }
-    else { console.log(doc); }
-});
+// pullGame("4pLeague_S10_D1L1_G1")
+// .then(x => parseGame(x, "4pLeague_S10_D1L1_G1"))
+// // .then(uploadGame)
+// // .then(x => console.log("sucess: ", x.game))
+// .then(console.log)
+// .catch(x => {
+//     console.log("failure ", x);
+// });
+
+// var q = "select * from c where c.id = '4pLeague_S5_D1L2_G1'";
+// var collLink = 'dbs/dev/colls/games';
+// client.queryDocuments(collLink, q).toArray(function(err, results) { 
+//     if(err) { console.log(err); }
+//     else { console.log(results[0]); console.log(results[0]); }
+// });
 
 
 function pullGameList() { 
@@ -136,8 +130,8 @@ function scheduleParses(gameList, logFile) {
                 .then(x => logSuccess(x, logFile))
                 .then(x => console.log("sucess: ", x.game))
                 .catch(x => {
-                    logFailure({game: game.id, issue: x}, logFile);
                     console.log("failure", game);
+                    logFailure({game: game.id, issue: x}, logFile);
                 });
             }, timeout, game);
         }
@@ -186,7 +180,8 @@ function parseGame(rawGame, gameName) {
             rounds: engineSetup.rounds,
             fireAndIceBonus: engineSetup.fireAndIceBonus,
             gameComplete: gameComplete,
-            bonuses: engineSetup.bonuses
+            bonuses: engineSetup.bonuses,
+            results: rulesEngine.buildGameResults(scoreCards)
         };
 
         obj.factions = _.map(scoreCards, x => x.faction);
@@ -216,8 +211,11 @@ function scheduleDeletes(gameList, logFile) {
             setTimeout(function() { 
                 deleteGame(game)
                 .then(x => logSuccess(x, logFile))
-                .then(x => console.log("sucess: ", x.game))
-                .catch(x => logFailure({game: game, issue: x}, logFile));
+                .then(x => console.log("sucess: ", x.game.id))
+                .catch(x => {
+                    console.log("failure", x);
+                    logFailure({game: game, issue: x}, logFile)
+                });
             }, timeout, game);
         }
         setTimeout(function() { 
