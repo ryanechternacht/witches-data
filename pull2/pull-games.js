@@ -31,22 +31,22 @@ var client = new DocumentClient(host, {masterKey: masterKey});
 //     }
 // });
 
-var docLink = 'dbs/snellman/colls/games/docs/4pLeague_S1_D2L2_G1';
+// var docLink = 'dbs/snellman/colls/games/docs/4pLeague_S1_D2L2_G1';
 
-client.readAttachments(docLink).toArray(function(err, results) {
-    if(err) { console.log("failure attachment"); console.log(err); }
-    else {
-        var attach = results[0];
-        var mediaLink = attach.media;
-        client.readMedia(mediaLink, function(err2, attachment) { 
-            if(err2) { console.log("failure media"); console.log(err2); } 
-            else { 
-                var a = JSON.parse(attachment);
-                console.dir(a.ledger.length);
-            }
-        });
-    }
-});
+// client.readAttachments(docLink).toArray(function(err, results) {
+//     if(err) { console.log("failure attachment"); console.log(err); }
+//     else {
+//         var attach = results[0];
+//         var mediaLink = attach.media;
+//         client.readMedia(mediaLink, function(err2, attachment) { 
+//             if(err2) { console.log("failure media"); console.log(err2); } 
+//             else { 
+//                 var a = JSON.parse(attachment);
+//                 console.dir(a.ledger.length);
+//             }
+//         });
+//     }
+// });
 
 
 // deleteGame("onion")
@@ -80,6 +80,15 @@ client.readAttachments(docLink).toArray(function(err, results) {
 //         // fs.writeFile(pf, f, function(e, d) { });
 //     }
 // });
+
+pullGame("4pLeague_S10_D2L2_G1")
+.then(loadGame)
+.then(function(status) {
+    console.log("success: " + status.game);
+})
+.catch(function(status) { 
+    console.log("failure: " + status.game + " || " + status.step);
+});
 
 
 

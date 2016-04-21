@@ -19,12 +19,12 @@ var host = azureInfo.host,
 //     else { console.log(results); }
 // });
 
-var q = "select * from c where c.id = '4pLeague_S10_D2L2_G1'";
-var collLink = 'dbs/dev/colls/games';
-client.queryDocuments(collLink, q).toArray(function(err, results) { 
-    if(err) { console.log(err); }
-    else { console.log(results); }
-});
+// var q = "select * from c where c.id = '4pLeague_S10_D2L2_G1'";
+// var collLink = 'dbs/dev/colls/games';
+// client.queryDocuments(collLink, q).toArray(function(err, results) { 
+//     if(err) { console.log(err); }
+//     else { console.log(results); }
+// });
 
 // analyzeAllFactions()
 // .then(console.log)
@@ -32,6 +32,15 @@ client.queryDocuments(collLink, q).toArray(function(err, results) {
 
 
 // analyzeFactions();
+// analyzeFaction("fakirs");
+
+getSampleGames()
+.then(getGameDataForAllFactions)
+.then(x => analyzeAllGames(x))
+.then(x => uploadFactionResults(x, "all"))
+.then(x => console.log("done"))
+.catch(x => console.log(x.stack)); // always keep uploading
+
 
 function analyzeFactions() {
     console.log("analyze factions");
@@ -75,7 +84,7 @@ function analyzeAllFactions() {
         console.log("start download for: all factions");
         getAllGames()
         .then(getGameDataForAllFactions)
-        .then(x => analyzeGames(x, "all"))
+        .then(x => analyzeAllGames(x))
         .then(x => uploadFactionResults(x, "all"))
         .then(resolve)
         .catch(x => { console.log(x); resolve(x); }); // always keep uploading
@@ -105,6 +114,19 @@ function getAllGames() {
             }
             resolve(results);
         });
+    });
+}
+
+function getSampleGames() {
+    return new Promise(function(resolve, reject) { 
+        resolve([
+            {id: "4pLeague_S6_D1L1_G1", factions: ["darklings", "nomads", "dwarves", "witches"]},
+            {id: "4pLeague_S6_D1L1_G2", factions: ["darklings", "nomads", "mermaids", "engineers"]},
+            {id: "4pLeague_S6_D1L1_G3", factions: ["halflings", "chaosmagicians", "mermaids", "witches"]},
+            {id: "4pLeague_S6_D1L1_G4", factions: ["darklings", "nomads", "swarmlings", "witches"]},
+            {id: "4pLeague_S6_D1L1_G5", factions: ["darklings", "engineers", "halflings", "giants"]},
+            {id: "4pLeague_S6_D1L1_G6", factions: ["darklings", "nomads", "mermaids", "engineers"]},
+        ]);
     });
 }
 
@@ -156,11 +178,14 @@ function getGameDataForAllFactions(gameList) {
 
 function pullGame(game, faction) { 
     return new Promise(function(resolve, reject) { 
-        var q = "select c." + faction + " from c where c.id = '" + game + "'";
+        var q = "select c." + faction + ", c.results from c where c.id = '" + game + "'";
         var collLink = 'dbs/dev/colls/games';
         client.queryDocuments(collLink, q).toArray(function(err, results) { 
             if(err) { reject({ step: "pull game", err: err, game: game }); }
-            else { resolve(results[0][faction]); }
+            else { 
+                var d = results[0];
+                resolve({game: d[faction], results: d.results }); 
+            }
         });
     });
 }
@@ -170,11 +195,11 @@ function analyzeGames(gameData, faction) {
         var obj = { id: faction, faction: faction };
 
         obj.total = createHistogram(
-            _.map(gameData, x => x.total), 
+            _.map(gameData, x => x.game.total), 
             {bucketsize: 10, type: 'auto', labels: 'decades'}
         );
         obj.network = createHistogram(
-            _.map(gameData, x => x.simple.endGameNetwork), 
+            _.map(gameData, x => x.game.simple.endGameNetwork), 
             { // options
                 type: 'manual', 
                 buckets: [
@@ -186,18 +211,60 @@ function analyzeGames(gameData, faction) {
             }
         );
         obj.buildings = createHistogram(
-            _.map(gameData, x => x.d + x.tp + x.te + x.sh + x.sa), 
+            _.map(gameData, x => x.game.d + x.game.tp + x.game.te + x.game.sh + x.game.sa), 
             { bucketsize: 1, type: 'auto', labels: 'exact'}
         );
         obj.cult = createHistogram(
-            _.map(gameData, x => x.simple.endGameCult), 
+            _.map(gameData, x => x.game.simple.endGameCult), 
             {bucketsize: 4, type: 'auto', labels: 'range'});
         obj.games = gameData.length;
-        obj.favors = createFavorsHistogram(_.map(gameData, x => x.favors));
+        obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
         obj.pickOrder = createHistogram(
-            _.map(gameData, x => x.startOrder), // startOrder is 0-indexed 
+            _.map(gameData, x => x.game.startOrder), // startOrder is 0-indexed 
             {bucketsize: 1, type: 'auto', labels: 'exact'}
         );
+        obj.results = createHistogram(
+            _.map(gameData, x => {
+                var result = _.find(x.results, y => y.faction == faction);
+                return result.place;
+            }),
+            {bucketsize: 1, type: 'auto', labels: 'exact'}
+        );
+
+        resolve(obj);
+    });
+}
+
+function analyzeAllGames(gameData) { 
+    return new Promise(function(resolve, reject) { 
+        var obj = { id: "all", faction: "all" };
+
+        obj.total = createHistogram(
+            _.map(gameData, x => x.game.total), 
+            {bucketsize: 10, type: 'auto', labels: 'decades'}
+        );
+        obj.network = createHistogram(
+            _.map(gameData, x => x.game.simple.endGameNetwork), 
+            { // options
+                type: 'manual', 
+                buckets: [
+                    { min: 0, max: 2, label: 'no points'}, // 0
+                    { min: 3, max: 8, label: '3rd'}, // 3 and 6
+                    { min: 9, max: 14, label: '2nd'}, // 9 and 12
+                    { min: 15, max: 18, label: '1st'}, // 15 and 18
+                ]
+            }
+        );
+        obj.buildings = createHistogram(
+            _.map(gameData, x => x.game.d + x.game.tp + x.game.te + x.game.sh + x.game.sa), 
+            { bucketsize: 1, type: 'auto', labels: 'exact'}
+        );
+        obj.cult = createHistogram(
+            _.map(gameData, x => x.game.simple.endGameCult), 
+            {bucketsize: 4, type: 'auto', labels: 'range'});
+        obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
+        
+        obj.results = createFactionComparisons(gameData);
 
         resolve(obj);
     });
@@ -260,8 +327,6 @@ function createFavorsHistogram(favors) {
 
     var obj = [];
 
-    console.log(favors[0]);
-
     for(var i = 0; i < favs.length; i++) { 
         var fav = favs[i];
 
@@ -271,12 +336,84 @@ function createFavorsHistogram(favors) {
     }
 
     return obj;
+}
 
+function createFactionComparisons(gameData) {
+    var createResult = x => ({
+        faction: x, 
+        fakirs: {win: 0, tie: 0, loss: 0}, nomads: {win: 0, tie: 0, loss: 0}, 
+        auren: {win: 0, tie: 0, loss: 0}, witches: {win: 0, tie: 0, loss: 0}, 
+        engineers: {win: 0, tie: 0, loss: 0}, dwarves: {win: 0, tie: 0, loss: 0}, 
+        mermaids: {win: 0, tie: 0, loss: 0}, swarmlings: {win: 0, tie: 0, loss: 0}, 
+        darklings: {win: 0, tie: 0, loss: 0}, alchemists: {win: 0, tie: 0, loss: 0}, 
+        halflings: {win: 0, tie: 0, loss: 0}, cultists: {win: 0, tie: 0, loss: 0}, 
+        giants: {win: 0, tie: 0, loss: 0}, chaosmagicians: {win: 0, tie: 0, loss: 0}
+    });
+
+    var resultTable = [
+        createResult("fakirs"),
+        createResult("nomads"),
+        createResult("auren"),
+        createResult("witches"),
+        createResult("engineers"),
+        createResult("dwarves"),
+        createResult("mermaids"),
+        createResult("swarmlings"),
+        createResult("darklings"),
+        createResult("alchemists"),
+        createResult("halflings"),
+        createResult("cultists"),
+        createResult("giants"),
+        createResult("chaosmagicians"),
+    ];
+
+    // we only need to grab the result set for each game once, however each game
+    // occurs in the dataset 4 times, once for each faction. we thus skip every 
+    // 4 records (since ach game is stored consecutively).
+    for(var g = 0; g < gameData.length; g+=4) { 
+        var results = gameData[g].results;
+
+        for(var r = 0; r < results.length; r++) { 
+            var result = results[r];
+            var faction = _.find(resultTable, x => x.faction == result.faction);
+
+            // loop the results again, to compare every result to each other
+            // this could be optimized by doing bi-directional comparisons, but whatever
+            for(var o = 0; o < results.length; o++) {
+                if(o == r) { // skip yourself
+                    continue;
+                }
+
+                var other = results[o];
+
+                if(result.place < other.place) { // win
+                    // console.log(result.faction + " beat " + other.faction);
+                    faction[other.faction].win = faction[other.faction].win + 1;
+                } else if(result.place > other.place) { // loss
+                    // console.log(other.faction + " beat " + result.faction);
+                    faction[other.faction].loss = faction[other.faction].loss + 1;
+                } else { // tie
+                    // console.log(result.faction + " tied " + other.faction);
+                    faction[other.faction].tie = faction[other.faction].tie + 1;
+                }
+            }
+            // console.log(faction);
+        }
+    }
+
+    return resultTable;
+
+    // createHistogram(
+    //         _.map(gameData, x => {
+    //             var result = _.find(x.results, y => y.faction == faction);
+    //             return result.place;
+    //         }),
+    //         {bucketsize: 1, type: 'auto', labels: 'exact'}
+    //     );
 }
 
 function uploadFactionResults(data, faction) { 
     return new Promise(function(resolve, reject) { 
-        console.log(data);
         var collLink = 'dbs/dev/colls/factions';
         client.upsertDocument(collLink, data, function(err, document) {
             if(err) { reject({ step: "upload", err: err }); }

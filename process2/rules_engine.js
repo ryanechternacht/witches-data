@@ -181,6 +181,7 @@ module.exports = (function() {
     function buildGameResults(scoreCards) { 
         var ordered = _.sortBy(scoreCards, x => x.total).reverse();
 
+        // BUG this doesn't handle ties
         return _.map(ordered, (x,i) => ({
             faction: x.faction, 
             player: x.name,
