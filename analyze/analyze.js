@@ -31,15 +31,15 @@ var host = azureInfo.host,
 // .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
 
 
-// analyzeFactions();
+analyzeFactions();
 // analyzeFaction("fakirs");
 
-getSampleGames()
-.then(getGameDataForAllFactions)
-.then(x => analyzeAllGames(x))
-.then(x => uploadFactionResults(x, "all"))
-.then(x => console.log("done"))
-.catch(x => console.log(x.stack)); // always keep uploading
+// getSampleGames()
+// .then(getGameDataForAllFactions)
+// .then(x => analyzeAllGames(x))
+// .then(x => uploadFactionResults(x, "all"))
+// .then(x => console.log("done"))
+// .catch(x => console.log(x.stack)); // always keep uploading
 
 
 function analyzeFactions() {
@@ -219,16 +219,36 @@ function analyzeGames(gameData, faction) {
             {bucketsize: 4, type: 'auto', labels: 'range'});
         obj.games = gameData.length;
         obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
+        // obj.pickOrder = createHistogram(
+        //     _.map(gameData, x => x.game.startOrder), // startOrder is 0-indexed 
+        //     {bucketsize: 1, type: 'auto', labels: 'exact'}
+        // );
         obj.pickOrder = createHistogram(
-            _.map(gameData, x => x.game.startOrder), // startOrder is 0-indexed 
-            {bucketsize: 1, type: 'auto', labels: 'exact'}
+            _.map(gameData, x => x.game.startOrder), 
+            { // options
+                type: 'manual', 
+                buckets: [
+                    { min: 1, max: 1, label: '1st'},
+                    { min: 2, max: 2, label: '2nd'},
+                    { min: 3, max: 3, label: '3rd'},
+                    { min: 4, max: 4, label: '4th'},
+                ]
+            }
         );
         obj.results = createHistogram(
             _.map(gameData, x => {
                 var result = _.find(x.results, y => y.faction == faction);
                 return result.place;
             }),
-            {bucketsize: 1, type: 'auto', labels: 'exact'}
+            { // options
+                type: 'manual', 
+                buckets: [
+                    { min: 1, max: 1, label: '1st'},
+                    { min: 2, max: 2, label: '2nd'},
+                    { min: 3, max: 3, label: '3rd'},
+                    { min: 4, max: 4, label: '4th'},
+                ]
+            }
         );
 
         resolve(obj);
@@ -351,25 +371,25 @@ function createFactionComparisons(gameData) {
     });
 
     var resultTable = [
+        createResult("dwarves"),
+        createResult("engineers"),
+        createResult("chaosmagicians"),
+        createResult("giants"),
         createResult("fakirs"),
         createResult("nomads"),
-        createResult("auren"),
-        createResult("witches"),
-        createResult("engineers"),
-        createResult("dwarves"),
-        createResult("mermaids"),
-        createResult("swarmlings"),
-        createResult("darklings"),
-        createResult("alchemists"),
         createResult("halflings"),
         createResult("cultists"),
-        createResult("giants"),
-        createResult("chaosmagicians"),
+        createResult("alchemists"),
+        createResult("darklings"),
+        createResult("swarmlings"),
+        createResult("mermaids"),
+        createResult("auren"),
+        createResult("witches"),
     ];
 
     // we only need to grab the result set for each game once, however each game
     // occurs in the dataset 4 times, once for each faction. we thus skip every 
-    // 4 records (since ach game is stored consecutively).
+    // 4 records (since each game is stored consecutively).
     for(var g = 0; g < gameData.length; g+=4) { 
         var results = gameData[g].results;
 
@@ -387,29 +407,17 @@ function createFactionComparisons(gameData) {
                 var other = results[o];
 
                 if(result.place < other.place) { // win
-                    // console.log(result.faction + " beat " + other.faction);
                     faction[other.faction].win = faction[other.faction].win + 1;
                 } else if(result.place > other.place) { // loss
-                    // console.log(other.faction + " beat " + result.faction);
                     faction[other.faction].loss = faction[other.faction].loss + 1;
                 } else { // tie
-                    // console.log(result.faction + " tied " + other.faction);
                     faction[other.faction].tie = faction[other.faction].tie + 1;
                 }
             }
-            // console.log(faction);
         }
     }
 
     return resultTable;
-
-    // createHistogram(
-    //         _.map(gameData, x => {
-    //             var result = _.find(x.results, y => y.faction == faction);
-    //             return result.place;
-    //         }),
-    //         {bucketsize: 1, type: 'auto', labels: 'exact'}
-    //     );
 }
 
 function uploadFactionResults(data, faction) { 
