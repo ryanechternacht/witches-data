@@ -3,6 +3,8 @@
 
 module.exports = (function() { 
     
+    var _ = require('underscore');
+
     var rules = [
         score1_onSpd,
         score2_onTw,
@@ -162,8 +164,6 @@ module.exports = (function() {
             sumPoints(players[i]);
         }
 
-        buildGameResults(players);
-
         return players;
     }
 
@@ -179,13 +179,15 @@ module.exports = (function() {
     }
 
     function buildGameResults(scoreCards) { 
-        var ordered = _.sortBy(scoreCards, x => 'total').reverse();
+        var ordered = _.sortBy(scoreCards, x => x.total).reverse();
+
+        // BUG this doesn't handle ties
         return _.map(ordered, (x,i) => ({
             faction: x.faction, 
             player: x.name,
             startOrder: x.startOrder,
             place: i + 1
-        }))  
+        }));
     }
     /// END PUBLIC
 
@@ -1499,7 +1501,7 @@ module.exports = (function() {
         return null;
     }
     /// END RULES
-)();
+})();
 
 
 
