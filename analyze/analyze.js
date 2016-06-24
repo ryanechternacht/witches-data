@@ -11,27 +11,22 @@ var host = azureInfo.host,
     timeoutBetweenPulls = 1000, // 1s
     timeoutDelay = 5000; // 5s
 
+var faction = "auren";
+ getFactionGames(faction)
+    .then(x => getGameData(x, faction))
+    .then(x => analyzeGames(x, faction))
+    .then(x => {console.log();console.log();console.log();console.log(x.shstats);})
+    .catch(x => { console.log(x); resolve(x); }); // always keep uploading
+ 
 
-// var q = "select * from c where c.id = '" + 'auren' + "'";
-// var collLink = 'dbs/dev/colls/factions';
-// client.queryDocuments(collLink, q).toArray(function(err, results) { 
-//     if(err) { console.log(err); }
-//     else { console.log(results); }
-// });
 
-// var q = "select * from c where c.id = '4pLeague_S10_D2L2_G1'";
-// var collLink = 'dbs/dev/colls/games';
-// client.queryDocuments(collLink, q).toArray(function(err, results) { 
-//     if(err) { console.log(err); }
-//     else { console.log(results); }
-// });
 
 // analyzeAllFactions()
 // .then(console.log)
 // .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
 
 
-analyzeFactions();
+// analyzeFactions();
 // analyzeFaction("fakirs");
 
 // getSampleGames()
@@ -40,6 +35,9 @@ analyzeFactions();
 // .then(x => uploadFactionResults(x, "all"))
 // .then(x => console.log("done"))
 // .catch(x => console.log(x.stack)); // always keep uploading
+
+
+
 
 
 function analyzeFactions() {
@@ -251,6 +249,20 @@ function analyzeGames(gameData, faction) {
             }
         );
 
+        obj.shstats = createMultigroupHistogram(
+            [
+                _.map(_.filter(gameData, 
+                        x => x.game.shstats && x.game.shstats.roundBonus), 
+                    x => x.game.shstats.round
+                ),
+                _.map(_.filter(gameData, 
+                        x => x.game.shstats && !x.game.shstats.roundBonus), 
+                    x => x.game.shstats.round
+                )
+            ],
+            { bucketsize: 1, type: 'auto', labels: 'exact' }
+        );
+
         resolve(obj);
     });
 }
@@ -277,11 +289,11 @@ function analyzeAllGames(gameData) {
         );
         obj.buildings = createHistogram(
             _.map(gameData, x => x.game.d + x.game.tp + x.game.te + x.game.sh + x.game.sa), 
-            { bucketsize: 1, type: 'auto', labels: 'exact'}
+            { bucketsize: 1, type: 'auto', labels: 'exact' }
         );
         obj.cult = createHistogram(
             _.map(gameData, x => x.game.simple.endGameCult), 
-            {bucketsize: 4, type: 'auto', labels: 'range'});
+            { bucketsize: 4, type: 'auto', labels: 'range' });
         obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
         
         obj.results = createFactionComparisons(gameData);
@@ -337,6 +349,45 @@ function createHistogram(scores, options) {
 
     } else { 
         throw "type must be 'auto' or 'manual'";
+    }
+}
+
+function createMultigroupHistogram(scores, options) {
+    // TODO implement the rest of the options parameters
+
+    //TODO implement a good way to pass in sub groups headers
+    if(options.type == 'auto') { 
+        var combined = [];
+        for(var i = 0; i < scores.length; i++) { 
+            combined = combined.concat(scores[i]);
+        }
+        var combinedCounts = _.countBy(combined, x => { 
+            if(isNaN(x)) { return 0; }
+            else { return Math.floor(x / options.bucketsize) * options.bucketsize; }
+        });
+        var combinedKeys = _.keys(combinedCounts);
+        var combinedNums = _.map(combinedKeys, x => parseInt(x, 10));
+        var combinedOrdered = _.sortBy(combinedNums, x => x);
+
+
+        var result = _.map(combinedOrdered, (x, i) => ({ order: i, key: x, value: [] }));
+        for(var i = 0; i < scores.length; i++) { 
+            var dataset = scores[i];
+            var counts = _.countBy(dataset, x => {
+                if(isNaN(x)) { return 0; }
+                else { return Math.floor(x / options.bucketsize) * options.bucketsize; }
+            });
+            for(var j = 0; j < result.length; j++) {
+                result[j].value.push(counts[result[j].key] || 0);
+            }
+        }
+
+        if(options.labels == 'exact') { 
+            return result;
+        }
+    }
+    else {
+        throw "not implemented";
     }
 }
 

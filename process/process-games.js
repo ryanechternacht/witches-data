@@ -1,7 +1,7 @@
 'use strict';
 
 var parser = require('./parse.js'),
-    rulesEngine = require('./rules_engine.js'),
+    rulesEngine = require('./rules_engine.js')(),
     DocumentClient = require('documentdb').DocumentClient,
     azureInfo = require('../secret/azureinfo.js'),
     argv = require('minimist')(process.argv.slice(2)),
@@ -36,57 +36,16 @@ else {
     .catch(console.dir);
 }
 
-// var p = path.join(__dirname, "run.tmp");
-// fs.readFile(p, function(err, data) { 
-//     if(err) { reject(err); }
-//     else { 
-//         var log = JSON.parse(data);
-//         console.log(log.success.length);
-//         console.log(log.failure.length);
+// var game = {id: "4pLeague_S1_D1L1_G1"};
 
-//         var s = "";
-//         for(var i = 0; i < log.success.length; i++) { 
-//             s += log.success[i].game + "\n";
-//         }
-//         var ps = path.join(__dirname, "success.tmp");
-//         fs.writeFile(ps, s, function(e, d) { });
+// pullGame(game.id)
+// .then(x => parseGame(x, game.id))
+// .then(uploadGame)
+// .then(x => logSuccess(x, logFile))
+// .then(x => console.log("sucess: ", x.game))
+// .catch(console.log);
 
-//         var f = "";
-//         for(var i = 0; i < log.failure.length; i++) { 
-//             f += log.failure[i].game + "\n";
-//         }
-//         var pf = path.join(__dirname, "failure.tmp");
-//         fs.writeFile(pf, f, function(e, d) { });
-//     }
-// });
-
-// setupLogFile(logFile)
-// .then(x => loadGameList(gameList))
-// .then(x => scheduleParses(x, logFile))
-// .then(console.log)
-// .catch(console.dir);
-
-// var docLink = 'dbs/dev/colls/games/docs/4pLeague_S10_D2L2_G1';
-// client.deleteDocument(docLink, function(err, doc) { 
-//     if(err) { console.log(err); }
-//     else { console.log(doc); }
-// });
-
-// pullGame("4pLeague_S10_D1L1_G1")
-// .then(x => parseGame(x, "4pLeague_S10_D1L1_G1"))
-// // .then(uploadGame)
-// // .then(x => console.log("sucess: ", x.game))
-// .then(console.log)
-// .catch(x => {
-//     console.log("failure ", x);
-// });
-
-// var q = "select * from c where c.id = '4pLeague_S5_D1L2_G1'";
-// var collLink = 'dbs/dev/colls/games';
-// client.queryDocuments(collLink, q).toArray(function(err, results) { 
-//     if(err) { console.log(err); }
-//     else { console.log(results[0]); console.log(results[0]); }
-// });
+// console.log(rulesEngine);
 
 
 function pullGameList() { 
