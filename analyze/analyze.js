@@ -21,10 +21,11 @@ if(prodFlag) {
     factionsLink = 'dbs/prod/colls/factions';
 }
 
+// analyzeFaction("dwarves");
 // analyzeFactions();
 
-var faction = "dwarves";
- getFactionGames(faction)
+var faction = "fakirs";
+getFactionGames(faction)
     .then(x => getGameData(x, faction))
     .then(x => analyzeGames(x, faction))
     .then(x => {console.log();console.log();console.log();console.log(x.shstats);})
@@ -37,8 +38,6 @@ var faction = "dwarves";
 // .then(console.log)
 // .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
 
-
-// analyzeFaction("fakirs");
 
 // getSampleGames()
 // .then(getGameDataForAllFactions)
@@ -259,16 +258,27 @@ function analyzeGames(gameData, faction) {
                         x => x.game.shstats && x.game.shstats.roundBonus), 
                     x => x.game.shstats.round
                 ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
-                    x => 0
+                    x => 7
                 )),
                 _.map(_.filter(gameData, 
                         x => x.game.shstats && !x.game.shstats.roundBonus), 
                     x => x.game.shstats.round
                 ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
-                    x => 0
+                    x => 7
                 ))
             ],
-            { bucketsize: 1, type: 'auto', labels: 'exact' }
+            { 
+                type: 'manual',
+                buckets: [
+                    { min: 1, max: 1, label: '1' },
+                    { min: 2, max: 2, label: '2' },
+                    { min: 3, max: 3, label: '3' },
+                    { min: 4, max: 4, label: '4' },
+                    { min: 5, max: 5, label: '5' },
+                    { min: 6, max: 6, label: '6' },
+                    { min: 7, max: 7, label: 'no-sh' }
+                ]
+            }
         );
 
         resolve(obj);
@@ -390,7 +400,56 @@ function createMultigroupHistogram(scores, options) {
         }
 
         if(options.labels == 'exact') { 
-            return result;
+            return { 
+                data: result,
+                legend: [/*TODO*/]
+            };
+        }
+    }
+    else if(options.type == 'manual') {
+        // we're assuming buckets are in order
+        var data = _.map(options.buckets, (b,i) => 
+            ({ ordering: i, key: b.label, value: [] })
+        ).concat([
+            { ordering: options.buckets.length, key: "uncategorized", value: [] }
+        ]);
+        
+        for(var i = 0; i < scores.length; i++) {
+            var s = scores[i];
+            var counts = _.countBy(s, x => { 
+                if(isNaN(x)) { x = 0; } // is this legal?
+                for(var j = 0; j < options.buckets.length; j++) {
+                    var b = options.buckets[j];
+                    if(x >= b.min && x <= b.max) { 
+                        return b.label;
+                    }
+                }
+                return "uncategorized";
+            });
+
+            var keys = _.keys(counts);
+            _.each(keys, x => {
+                var bucket = _.find(data, d => d.key == x);
+                bucket.value[i] = counts[x];
+            });
+
+            // backfill 0's
+            for(var k = 0; k < data.length; k++) {
+                if(data[k].value[i] == undefined) {
+                    data[k].value[i] = 0;
+                }
+            }
+        }
+
+        // check if uncategorized has values
+        var uncat = _.find(data, x => x.key == "uncategorized")
+        if(_.every(uncat.value, x => x == 0)) {
+            data.splice(data.length - 1);
+        }
+
+        return {
+            data: data,
+            legend: []
         }
     }
     else {
