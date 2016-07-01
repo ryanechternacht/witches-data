@@ -3,15 +3,27 @@
 var DocumentClient = require('documentdb').DocumentClient,
     azureInfo = require('../secret/azureinfo.js'),
     Promise = require('promise'),
-    _ = require('underscore');
+    _ = require('underscore'),
+    argv = require('minimist')(process.argv.slice(2));
 
 var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
-    client = new DocumentClient(host, {masterKey: masterKey}),
+    client = new DocumentClient(host, { masterKey: masterKey }),
     timeoutBetweenPulls = 1000, // 1s
-    timeoutDelay = 5000; // 5s
+    timeoutDelay = 5000, // 5s
+    prodFlag = argv['prod'],
+    deleteFlag = argv['d'],
+    gamesLink = 'dbs/dev/colls/games',
+    factionsLink = 'dbs/dev/colls/factions'; // dev link, prod set below
 
-var faction = "auren";
+
+if(prodFlag) {
+    factionsLink = 'dbs/prod/colls/factions';
+}
+
+// analyzeFactions();
+
+var faction = "dwarves";
  getFactionGames(faction)
     .then(x => getGameData(x, faction))
     .then(x => analyzeGames(x, faction))
@@ -26,7 +38,6 @@ var faction = "auren";
 // .catch(x => { console.log("failed"); console.log(x); console.log(x.stack); });
 
 
-// analyzeFactions();
 // analyzeFaction("fakirs");
 
 // getSampleGames()
@@ -92,8 +103,7 @@ function analyzeAllFactions() {
 function getFactionGames(faction) { 
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id from c where array_contains(c.factions, '" + faction + "')";
-        var collLink = 'dbs/dev/colls/games';
-        client.queryDocuments(collLink, q).toArray(function(err, results) { 
+        client.queryDocuments(gamesLink, q).toArray(function(err, results) { 
             if(err) { 
                 reject({ step: "pull games", err: err });
             }
@@ -105,8 +115,7 @@ function getFactionGames(faction) {
 function getAllGames() { 
     return new Promise(function(resolve, reject) { 
         var q = "SELECT c.id, c.factions from c";
-        var collLink = 'dbs/dev/colls/games';
-        client.queryDocuments(collLink, q).toArray(function(err, results) { 
+        client.queryDocuments(gamesLink, q).toArray(function(err, results) { 
             if(err) { 
                 reject({ step: "pull games", err: err });
             }
@@ -118,12 +127,12 @@ function getAllGames() {
 function getSampleGames() {
     return new Promise(function(resolve, reject) { 
         resolve([
-            {id: "4pLeague_S6_D1L1_G1", factions: ["darklings", "nomads", "dwarves", "witches"]},
-            {id: "4pLeague_S6_D1L1_G2", factions: ["darklings", "nomads", "mermaids", "engineers"]},
-            {id: "4pLeague_S6_D1L1_G3", factions: ["halflings", "chaosmagicians", "mermaids", "witches"]},
-            {id: "4pLeague_S6_D1L1_G4", factions: ["darklings", "nomads", "swarmlings", "witches"]},
-            {id: "4pLeague_S6_D1L1_G5", factions: ["darklings", "engineers", "halflings", "giants"]},
-            {id: "4pLeague_S6_D1L1_G6", factions: ["darklings", "nomads", "mermaids", "engineers"]},
+            { id: "4pLeague_S6_D1L1_G1", factions: ["darklings", "nomads", "dwarves", "witches"] },
+            { id: "4pLeague_S6_D1L1_G2", factions: ["darklings", "nomads", "mermaids", "engineers"] },
+            { id: "4pLeague_S6_D1L1_G3", factions: ["halflings", "chaosmagicians", "mermaids", "witches"] },
+            { id: "4pLeague_S6_D1L1_G4", factions: ["darklings", "nomads", "swarmlings", "witches"] },
+            { id: "4pLeague_S6_D1L1_G5", factions: ["darklings", "engineers", "halflings", "giants"] },
+            { id: "4pLeague_S6_D1L1_G6", factions: ["darklings", "nomads", "mermaids", "engineers"] },
         ]);
     });
 }
@@ -201,10 +210,10 @@ function analyzeGames(gameData, faction) {
             { // options
                 type: 'manual', 
                 buckets: [
-                    { min: 0, max: 2, label: 'no points'}, // 0
-                    { min: 3, max: 8, label: '3rd'}, // 3 and 6
-                    { min: 9, max: 14, label: '2nd'}, // 9 and 12
-                    { min: 15, max: 18, label: '1st'}, // 15 and 18
+                    { min: 0, max: 2, label: 'no points' }, // 0
+                    { min: 3, max: 8, label: '3rd' }, // 3 and 6
+                    { min: 9, max: 14, label: '2nd' }, // 9 and 12
+                    { min: 15, max: 18, label: '1st' }, // 15 and 18
                 ]
             }
         );
@@ -217,19 +226,15 @@ function analyzeGames(gameData, faction) {
             {bucketsize: 4, type: 'auto', labels: 'range'});
         obj.games = gameData.length;
         obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
-        // obj.pickOrder = createHistogram(
-        //     _.map(gameData, x => x.game.startOrder), // startOrder is 0-indexed 
-        //     {bucketsize: 1, type: 'auto', labels: 'exact'}
-        // );
         obj.pickOrder = createHistogram(
             _.map(gameData, x => x.game.startOrder), 
             { // options
                 type: 'manual', 
                 buckets: [
-                    { min: 1, max: 1, label: '1st'},
-                    { min: 2, max: 2, label: '2nd'},
-                    { min: 3, max: 3, label: '3rd'},
-                    { min: 4, max: 4, label: '4th'},
+                    { min: 1, max: 1, label: '1st' },
+                    { min: 2, max: 2, label: '2nd' },
+                    { min: 3, max: 3, label: '3rd' },
+                    { min: 4, max: 4, label: '4th' },
                 ]
             }
         );
@@ -241,24 +246,27 @@ function analyzeGames(gameData, faction) {
             { // options
                 type: 'manual', 
                 buckets: [
-                    { min: 1, max: 1, label: '1st'},
-                    { min: 2, max: 2, label: '2nd'},
-                    { min: 3, max: 3, label: '3rd'},
-                    { min: 4, max: 4, label: '4th'},
+                    { min: 1, max: 1, label: '1st' },
+                    { min: 2, max: 2, label: '2nd' },
+                    { min: 3, max: 3, label: '3rd' },
+                    { min: 4, max: 4, label: '4th' },
                 ]
             }
         );
-
         obj.shstats = createMultigroupHistogram(
             [
                 _.map(_.filter(gameData, 
                         x => x.game.shstats && x.game.shstats.roundBonus), 
                     x => x.game.shstats.round
-                ),
+                ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
+                    x => 0
+                )),
                 _.map(_.filter(gameData, 
                         x => x.game.shstats && !x.game.shstats.roundBonus), 
                     x => x.game.shstats.round
-                )
+                ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
+                    x => 0
+                ))
             ],
             { bucketsize: 1, type: 'auto', labels: 'exact' }
         );
@@ -273,17 +281,17 @@ function analyzeAllGames(gameData) {
 
         obj.total = createHistogram(
             _.map(gameData, x => x.game.total), 
-            {bucketsize: 10, type: 'auto', labels: 'decades'}
+            {bucketsize: 10, type: 'auto', labels: 'decades' }
         );
         obj.network = createHistogram(
             _.map(gameData, x => x.game.simple.endGameNetwork), 
             { // options
                 type: 'manual', 
                 buckets: [
-                    { min: 0, max: 2, label: 'no points'}, // 0
-                    { min: 3, max: 8, label: '3rd'}, // 3 and 6
-                    { min: 9, max: 14, label: '2nd'}, // 9 and 12
-                    { min: 15, max: 18, label: '1st'}, // 15 and 18
+                    { min: 0, max: 2, label: 'no points' }, // 0
+                    { min: 3, max: 8, label: '3rd' }, // 3 and 6
+                    { min: 9, max: 14, label: '2nd' }, // 9 and 12
+                    { min: 15, max: 18, label: '1st' }, // 15 and 18
                 ]
             }
         );
@@ -295,7 +303,6 @@ function analyzeAllGames(gameData) {
             _.map(gameData, x => x.game.simple.endGameCult), 
             { bucketsize: 4, type: 'auto', labels: 'range' });
         obj.favors = createFavorsHistogram(_.map(gameData, x => x.game.favors));
-        
         obj.results = createFactionComparisons(gameData);
 
         resolve(obj);
@@ -412,13 +419,13 @@ function createFavorsHistogram(favors) {
 function createFactionComparisons(gameData) {
     var createResult = x => ({
         faction: x, 
-        fakirs: {win: 0, tie: 0, loss: 0}, nomads: {win: 0, tie: 0, loss: 0}, 
-        auren: {win: 0, tie: 0, loss: 0}, witches: {win: 0, tie: 0, loss: 0}, 
-        engineers: {win: 0, tie: 0, loss: 0}, dwarves: {win: 0, tie: 0, loss: 0}, 
-        mermaids: {win: 0, tie: 0, loss: 0}, swarmlings: {win: 0, tie: 0, loss: 0}, 
-        darklings: {win: 0, tie: 0, loss: 0}, alchemists: {win: 0, tie: 0, loss: 0}, 
-        halflings: {win: 0, tie: 0, loss: 0}, cultists: {win: 0, tie: 0, loss: 0}, 
-        giants: {win: 0, tie: 0, loss: 0}, chaosmagicians: {win: 0, tie: 0, loss: 0}
+        fakirs: { win: 0, tie: 0, loss: 0 }, nomads: { win: 0, tie: 0, loss: 0 }, 
+        auren: { win: 0, tie: 0, loss: 0 }, witches: { win: 0, tie: 0, loss: 0 }, 
+        engineers: { win: 0, tie: 0, loss: 0 }, dwarves: { win: 0, tie: 0, loss: 0 }, 
+        mermaids: { win: 0, tie: 0, loss: 0 }, swarmlings: { win: 0, tie: 0, loss: 0 }, 
+        darklings: { win: 0, tie: 0, loss: 0 }, alchemists: { win: 0, tie: 0, loss: 0 }, 
+        halflings: { win: 0, tie: 0, loss: 0 }, cultists: { win: 0, tie: 0, loss: 0 }, 
+        giants: { win: 0, tie: 0, loss: 0 }, chaosmagicians: { win: 0, tie: 0, loss: 0 }
     });
 
     var resultTable = [
@@ -473,8 +480,7 @@ function createFactionComparisons(gameData) {
 
 function uploadFactionResults(data, faction) { 
     return new Promise(function(resolve, reject) { 
-        var collLink = 'dbs/dev/colls/factions';
-        client.upsertDocument(collLink, data, function(err, document) {
+        client.upsertDocument(factionsLink, data, function(err, document) {
             if(err) { reject({ step: "upload", err: err }); }
             else { 
                 resolve({ success: true, faction: faction });
