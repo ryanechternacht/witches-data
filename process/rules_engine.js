@@ -182,6 +182,24 @@ function RulesEngine() {
             sumPoints(players[i]);
         }
 
+        // when no SH built, check if a bonus existed
+        var hasShBonus = false;
+        for(var i = 0; i < rounds.length; i++) { 
+            var r = rounds[i];
+            if(r.scoreTile == "SCORE4"
+                || r.scoreTile == "SCORE7") {
+                hasShBonus = true;
+                break;
+            }
+        }
+
+        for(var i = 0; i < players.length; i++) {
+            var p = players[i];
+            if(!p.shstats) {
+                p.shstats = { round: 0, roundBonus: hasShBonus };
+            }
+        }
+
         return players;
     }
 

@@ -21,15 +21,15 @@ if(prodFlag) {
     factionsLink = 'dbs/prod/colls/factions';
 }
 
-// analyzeFaction("dwarves");
-// analyzeFactions();
+// analyzeFaction("fakirs");
+analyzeFactions();
 
-var faction = "fakirs";
-getFactionGames(faction)
-    .then(x => getGameData(x, faction))
-    .then(x => analyzeGames(x, faction))
-    .then(x => {console.log();console.log();console.log();console.log(x.shstats);})
-    .catch(x => { console.log(x); resolve(x); }); // always keep uploading
+// var faction = "dwarves";
+// getFactionGames(faction)
+//     .then(x => getGameData(x, faction))
+//     .then(x => analyzeGames(x, faction))
+//     .then(x => {console.log();console.log();console.log();console.log(x.shstats);})
+//     .catch(x => { console.log(x); resolve(x); }); // always keep uploading
  
 
 
@@ -254,18 +254,22 @@ function analyzeGames(gameData, faction) {
         );
         obj.shstats = createMultigroupHistogram(
             [
-                _.map(_.filter(gameData, 
-                        x => x.game.shstats && x.game.shstats.roundBonus), 
-                    x => x.game.shstats.round
-                ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
-                    x => 7
-                )),
-                _.map(_.filter(gameData, 
-                        x => x.game.shstats && !x.game.shstats.roundBonus), 
-                    x => x.game.shstats.round
-                ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
-                    x => 7
-                ))
+                // _.map(_.filter(gameData, 
+                //         x => x.game.shstats && x.game.shstats.roundBonus), 
+                //     x => x.game.shstats.round
+                // ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
+                //     x => 7
+                // )),
+                // _.map(_.filter(gameData, 
+                //         x => x.game.shstats && !x.game.shstats.roundBonus), 
+                //     x => x.game.shstats.round
+                // ).concat(_.map(_.filter(gameData, x => !x.game.shstats),
+                //     x => 7
+                // ))
+                _.map(_.filter(gameData, x => x.game.shstats.roundBonus), 
+                    x => x.game.shstats.round != 0 ? x.game.shstats.round : 7),
+                _.map(_.filter(gameData, x => !x.game.shstats.roundBonus), 
+                    x => x.game.shstats.round != 0 ? x.game.shstats.round : 7)
             ],
             { 
                 type: 'manual',

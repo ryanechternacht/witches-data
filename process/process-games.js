@@ -14,7 +14,7 @@ var parser = require('./parse.js'),
 var host = azureInfo.host,
     masterKey = azureInfo.masterKey,
     client = new DocumentClient(host, {masterKey: masterKey}),
-    timeBetweenParses = 3000, //5s
+    timeBetweenParses = 3000, //3s
     timeBetweenDeletes = 1000, //1s
     logFile = argv['l'] || 'run.tmp',
     deleteFlag = argv['d'],
@@ -27,8 +27,7 @@ if(deleteFlag) {
     .then(x => scheduleDeletes(x, logFile))
     .then(console.log)
     .catch(console.dir);
-}
-else {
+} else {
     setupLogFile(logFile)
     .then(x => pullGameList())
     .then(x => scheduleParses(x, logFile))
@@ -40,9 +39,10 @@ else {
 
 // pullGame(game.id)
 // .then(x => parseGame(x, game.id))
-// .then(uploadGame)
-// .then(x => logSuccess(x, logFile))
-// .then(x => console.log("sucess: ", x.game))
+// .then(console.log)
+// // .then(uploadGame)
+// // .then(x => logSuccess(x, logFile))
+// // .then(x => console.log("success: ", x.game))
 // .catch(console.log);
 
 // console.log(rulesEngine);
@@ -154,7 +154,7 @@ function uploadGame(gameObj) {
     return new Promise(function(resolve, reject) { 
         var collLink = 'dbs/dev/colls/games';
 
-        client.createDocument(collLink, gameObj, function(err, document) { 
+        client.upsertDocument(collLink, gameObj, function(err, document) { 
             if(err) { reject({ step: "upload game", err: err, game: gameObj.id }); }
             else { resolve({ success: true, game: gameObj.id }); }
         });
